@@ -24,6 +24,13 @@
         <a class="dash-nav-item active" data-page="overview" onclick="showPage('overview')">
             <span class="icon">[~]</span> 总览
         </a>
+        <a class="dash-nav-item" data-page="orders" onclick="showPage('orders')">
+            <span class="icon">[$]</span> 充值审核
+            <span id="pendingBadge" class="tag tag-yellow" style="font-size:11px; display:none; margin-left:6px;">0</span>
+        </a>
+        <a class="dash-nav-item" data-page="payment" onclick="showPage('payment')">
+            <span class="icon">[Q]</span> 收款配置
+        </a>
         <a class="dash-nav-item" data-page="users" onclick="showPage('users')">
             <span class="icon">[U]</span> 用户管理
         </a>
@@ -63,8 +70,80 @@
                     <div class="value" id="statTotalRev">$0.00</div>
                 </div>
                 <div class="stat-card">
+                    <div class="label">待审核充值</div>
+                    <div class="value" id="statPending" style="color: #D97706;">0</div>
+                </div>
+                <div class="stat-card">
                     <div class="label">上游状态</div>
                     <div class="value" id="statUpstream" style="font-size:16px;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recharge Orders (NEW) -->
+        <div id="page-orders" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="font-size: 24px;">充值审核</h1>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-outline btn-sm" onclick="loadOrders('pending')">待审核</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadOrders('approved')">已到账</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadOrders('all')">全部</button>
+                </div>
+            </div>
+            <div id="ordersMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>金额</th>
+                            <th>备注</th>
+                            <th>状态</th>
+                            <th>申请时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminOrdersBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Payment Config (NEW) -->
+        <div id="page-payment" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">收款配置</h1>
+            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">收款二维码</div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                    填写你的微信/支付宝收款二维码图片链接。建议先将二维码截图上传到图床（如 <a href="https://imgur.com" target="_blank">imgur.com</a>），然后把图片链接粘贴到这里。
+                </p>
+                <div class="form-group">
+                    <label class="form-label">微信收款码图片链接</label>
+                    <input type="text" class="form-input" id="wechatQrUrl" placeholder="https://i.imgur.com/xxx.png">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">支付宝收款码图片链接</label>
+                    <input type="text" class="form-input" id="alipayQrUrl" placeholder="https://i.imgur.com/xxx.png">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">联系信息（选填，会显示在用户充值页面）</label>
+                    <input type="text" class="form-input" id="contactInfo" placeholder="如：充值问题请联系微信 xxx">
+                </div>
+                <div id="paymentMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+                <button class="btn btn-primary" onclick="savePaymentConfig()">保存配置</button>
+            </div>
+            <!-- Preview -->
+            <div class="card" style="max-width: 600px;">
+                <div class="card-title" style="margin-bottom: 16px;">预览</div>
+                <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <div id="wechatPreview" style="text-align: center; display: none;">
+                        <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">微信收款码</p>
+                        <img id="wechatPreviewImg" style="width: 150px; height: 150px; border-radius: 8px; border: 1px solid var(--border); background: white; padding: 6px; object-fit: contain;">
+                    </div>
+                    <div id="alipayPreview" style="text-align: center; display: none;">
+                        <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">支付宝收款码</p>
+                        <img id="alipayPreviewImg" style="width: 150px; height: 150px; border-radius: 8px; border: 1px solid var(--border); background: white; padding: 6px; object-fit: contain;">
+                    </div>
+                    <div id="noPaymentPreview" style="color: var(--text-muted); font-size: 14px;">暂未配置收款码</div>
                 </div>
             </div>
         </div>
@@ -94,22 +173,7 @@
         <!-- Usage logs -->
         <div id="page-usage" style="display:none;">
             <h1 style="font-size: 24px; margin-bottom: 24px;">全部请求日志</h1>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>用户</th>
-                            <th>模型</th>
-                            <th>输入</th>
-                            <th>输出</th>
-                            <th>费用</th>
-                            <th>状态</th>
-                        </tr>
-                    </thead>
-                    <tbody id="allUsageBody"></tbody>
-                </table>
-            </div>
+            <div id="allUsageBody" style="color: var(--text-muted); padding: 40px; text-align: center;">日志查看功能开发中</div>
         </div>
 
         <!-- Config -->
@@ -167,8 +231,13 @@ function showPage(page) {
     document.getElementById('page-' + page).style.display = 'block';
     document.querySelectorAll('.dash-nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
+
+    if (page === 'orders') loadOrders('pending');
+    if (page === 'payment') loadPaymentConfig();
+    if (page === 'users') loadUsers();
 }
 
+// =========== Stats ===========
 async function loadStats() {
     try {
         const res = await fetch('/api/admin/stats', { headers: authHeaders() });
@@ -179,10 +248,199 @@ async function loadStats() {
             document.getElementById('statTodayReq').textContent = data.data.todayRequests;
             document.getElementById('statTodayRev').textContent = '$' + (data.data.todayUsage||0).toFixed(4);
             document.getElementById('statTotalRev').textContent = '$' + (data.data.totalUsage||0).toFixed(4);
+            document.getElementById('statPending').textContent = data.data.pendingOrders || 0;
+
+            // Update badge
+            const badge = document.getElementById('pendingBadge');
+            if (data.data.pendingOrders > 0) {
+                badge.textContent = data.data.pendingOrders;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
         }
     } catch(e) { console.error(e); }
 }
 
+// =========== Health ===========
+async function loadHealth() {
+    try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        const el = document.getElementById('statUpstream');
+        if (data.upstream_configured) {
+            el.innerHTML = '<span class="tag tag-green">已配置</span>';
+            document.getElementById('configStatus').innerHTML = '<span class="tag tag-green">QuickRouter API Key 已配置</span>';
+        } else {
+            el.innerHTML = '<span class="tag tag-red">未配置</span>';
+            document.getElementById('configStatus').innerHTML = '<span class="tag tag-red">QuickRouter API Key 未配置 - API 请求将返回 503</span>';
+        }
+    } catch(e) { console.error(e); }
+}
+
+// =========== Recharge Orders ===========
+let currentOrderFilter = 'pending';
+async function loadOrders(status) {
+    currentOrderFilter = status || 'pending';
+    try {
+        const res = await fetch('/api/admin/recharge/orders?status=' + currentOrderFilter, { headers: authHeaders() });
+        const data = await res.json();
+        const msgEl = document.getElementById('ordersMsg');
+        if (data.success) {
+            const pending = data.data.filter(o => o.status === 'pending').length;
+            if (pending > 0 && currentOrderFilter === 'pending') {
+                msgEl.style.display = 'block';
+                msgEl.style.background = '#F59E0B15';
+                msgEl.style.color = '#D97706';
+                msgEl.style.border = '1px solid #D97706';
+                msgEl.innerHTML = `<strong>⚠️ 有 ${pending} 笔充值待审核</strong><br>请核对收款记录后点击「确认到账」。`;
+            } else {
+                msgEl.style.display = 'none';
+            }
+
+            const body = document.getElementById('adminOrdersBody');
+            if (data.data.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:40px;">暂无充值记录</td></tr>';
+                return;
+            }
+            body.innerHTML = data.data.map(o => {
+                const statusMap = { pending: '待审核', approved: '已到账', rejected: '已拒绝' };
+                const statusColor = { pending: 'tag-yellow', approved: 'tag-green', rejected: 'tag-red' };
+                const actions = o.status === 'pending' ? `
+                    <button class="btn btn-primary btn-sm" onclick="approveOrder('${o.id}', ${o.amount}, '${o.username}')">确认到账</button>
+                    <button class="btn btn-danger btn-sm" onclick="rejectOrder('${o.id}')">拒绝</button>
+                ` : `<span style="font-size:12px; color:var(--text-muted);">${o.admin_note || '-'}</span>`;
+                return `
+                    <tr>
+                        <td><strong>${o.username}</strong></td>
+                        <td style="font-weight:600; font-size:15px;">$${(o.amount||0).toFixed(2)}</td>
+                        <td style="font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${o.note || ''}">${o.note || '-'}</td>
+                        <td><span class="tag ${statusColor[o.status]||'tag-yellow'}">${statusMap[o.status]||o.status}</span></td>
+                        <td style="font-size:12px; color:var(--text-muted);">${o.created_at}</td>
+                        <td style="display:flex; gap:6px;">${actions}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function approveOrder(id, amount, username) {
+    if (!confirm(`确认用户「${username}」的 $${amount} 充值已到账？\n\n确认后将从该用户余额中加上 $${amount}。`)) return;
+    try {
+        const res = await fetch('/api/admin/recharge/orders/' + id + '/approve', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ note: '管理员确认到账' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('✅ 充值已确认！用户余额已更新。');
+            loadOrders(currentOrderFilter);
+            loadStats();
+        }
+    } catch(e) { alert('操作失败'); }
+}
+
+async function rejectOrder(id) {
+    const note = prompt('拒绝原因（选填）：');
+    if (note === null) return; // cancelled
+    try {
+        await fetch('/api/admin/recharge/orders/' + id + '/reject', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ note: note || '未通过审核' })
+        });
+        alert('已拒绝该充值申请。');
+        loadOrders(currentOrderFilter);
+        loadStats();
+    } catch(e) { alert('操作失败'); }
+}
+
+// =========== Payment Config ===========
+async function loadPaymentConfig() {
+    try {
+        const res = await fetch('/api/payment/config');
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('wechatQrUrl').value = data.data.wechat_qr || '';
+            document.getElementById('alipayQrUrl').value = data.data.alipay_qr || '';
+            document.getElementById('contactInfo').value = data.data.contact || '';
+            updatePaymentPreview();
+        }
+        // Also load current config from admin endpoint
+        const res2 = await fetch('/api/admin/payment/config', { headers: authHeaders() });
+        const data2 = await res2.json();
+        if (data2.success) {
+            document.getElementById('wechatQrUrl').value = data2.data.wechat_qr || '';
+            document.getElementById('alipayQrUrl').value = data2.data.alipay_qr || '';
+            document.getElementById('contactInfo').value = data2.data.contact || '';
+            updatePaymentPreview();
+        }
+    } catch(e) { console.error(e); }
+}
+
+function updatePaymentPreview() {
+    const wechatUrl = document.getElementById('wechatQrUrl').value.trim();
+    const alipayUrl = document.getElementById('alipayQrUrl').value.trim();
+    const wechatBox = document.getElementById('wechatPreview');
+    const alipayBox = document.getElementById('alipayPreview');
+    const noPrev = document.getElementById('noPaymentPreview');
+
+    if (wechatUrl) {
+        document.getElementById('wechatPreviewImg').src = wechatUrl;
+        wechatBox.style.display = 'block';
+    } else {
+        wechatBox.style.display = 'none';
+    }
+    if (alipayUrl) {
+        document.getElementById('alipayPreviewImg').src = alipayUrl;
+        alipayBox.style.display = 'block';
+    } else {
+        alipayBox.style.display = 'none';
+    }
+    if (!wechatUrl && !alipayUrl) {
+        noPrev.style.display = 'block';
+    } else {
+        noPrev.style.display = 'none';
+    }
+}
+
+async function savePaymentConfig() {
+    const wechatQr = document.getElementById('wechatQrUrl').value.trim();
+    const alipayQr = document.getElementById('alipayQrUrl').value.trim();
+    const contact = document.getElementById('contactInfo').value.trim();
+    const msgEl = document.getElementById('paymentMsg');
+    msgEl.style.display = 'none';
+
+    try {
+        const res = await fetch('/api/admin/payment/config', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ wechat_qr: wechatQr, alipay_qr: alipayQr, contact })
+        });
+        const data = await res.json();
+        if (data.success) {
+            msgEl.style.display = 'block';
+            msgEl.style.background = '#065F4615';
+            msgEl.style.color = '#059669';
+            msgEl.style.border = '1px solid #059669';
+            msgEl.textContent = '✅ 收款配置已保存！用户现在可以在充值页面看到收款码了。';
+            updatePaymentPreview();
+        }
+    } catch(e) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = '#EF444415';
+        msgEl.style.color = '#EF4444';
+        msgEl.style.border = '1px solid #EF4444';
+        msgEl.textContent = '保存失败，请重试';
+    }
+}
+
+// Watch URL inputs for live preview
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('wechatQrUrl').addEventListener('input', updatePaymentPreview);
+    document.getElementById('alipayQrUrl').addEventListener('input', updatePaymentPreview);
+});
+
+// =========== Users ===========
 async function loadUsers() {
     try {
         const res = await fetch('/api/admin/users', { headers: authHeaders() });
@@ -208,60 +466,35 @@ async function loadUsers() {
     } catch(e) { console.error(e); }
 }
 
-async function loadAllUsage() {
-    // This would need an admin endpoint; for now use the admin stats
-    document.getElementById('allUsageBody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:40px;">日志查看功能开发中</td></tr>';
-}
-
-async function loadHealth() {
-    try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
-        if (data.success) {
-            const el = document.getElementById('statUpstream');
-            if (data.upstream_configured) {
-                el.innerHTML = '<span class="tag tag-green">已配置</span>';
-                document.getElementById('configStatus').innerHTML = '<span class="tag tag-green">QuickRouter API Key 已配置</span>';
-            } else {
-                el.innerHTML = '<span class="tag tag-red">未配置</span>';
-                document.getElementById('configStatus').innerHTML = '<span class="tag tag-red">QuickRouter API Key 未配置 - API 请求将返回 503</span>';
-            }
-        }
-    } catch(e) { console.error(e); }
-}
-
-async function saveConfig() {
-    const key = document.getElementById('upstreamKey').value.trim();
-    if (!key) { alert('请输入 API Key'); return; }
-    // In production this would save to config file
-    // For now, show instructions
-    alert('请用以下方式配置上游 Key:\n\n在服务器上运行:\nset UPSTREAM_API_KEY=' + key + '\n\n然后重启服务:\nnpm start');
-}
-
 function addBalance(userId) {
     const amount = prompt('充值金额 ($):', '10');
     if (!amount) return;
     fetch('/api/admin/users/' + userId, {
-        method: 'PUT',
-        headers: authHeaders(),
+        method: 'PUT', headers: authHeaders(),
         body: JSON.stringify({ balance: parseFloat(amount) })
-    }).then(r => r.json()).then(() => loadUsers());
+    }).then(r => r.json()).then(() => { loadUsers(); loadStats(); });
 }
 
 function toggleUser(userId, status) {
     const newStatus = status === 'active' ? 'suspended' : 'active';
     fetch('/api/admin/users/' + userId, {
-        method: 'PUT',
-        headers: authHeaders(),
+        method: 'PUT', headers: authHeaders(),
         body: JSON.stringify({ status: newStatus })
     }).then(r => r.json()).then(() => loadUsers());
 }
 
-// Init
+// =========== Config ===========
+function saveConfig() {
+    const key = document.getElementById('upstreamKey').value.trim();
+    if (!key) { alert('请输入 API Key'); return; }
+    alert('请用以下方式配置上游 Key:\n\n在服务器上运行（或通过 Render 环境变量配置）:\n\nUPSTREAM_API_KEY=' + key + '\n\n然后重启服务。\n\n（Render 用户请在 Render 控制台 → Environment 中设置该变量）');
+}
+
+// =========== Init ===========
 loadStats();
-loadUsers();
-loadAllUsage();
 loadHealth();
+// Auto-refresh stats every 30s
+setInterval(() => { loadStats(); loadHealth(); }, 30000);
 </script>
 
 </body>

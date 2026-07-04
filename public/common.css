@@ -191,6 +191,7 @@ tbody tr:hover { background: var(--bg-soft); }
 .tag-red { background: var(--red-light); color: #991B1B; }
 .tag-blue { background: #DBEAFE; color: #1E40AF; }
 .tag-amber { background: var(--amber-light); color: #92400E; }
+.tag-yellow { background: #FEF3C7; color: #92400E; }
 
 /* Key display */
 .key-box {

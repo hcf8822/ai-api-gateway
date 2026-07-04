@@ -61,34 +61,20 @@ function writeJSON(file, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Initialize admin if not exists
-function initAdmin() {
-  const users = readJSON('users.json');
-  if (!users.find(u => u.role === 'admin')) {
-    users.push({
-      id: uuidv4(), username: 'admin', email: 'admin@localhost',
-      password: bcrypt.hashSync('admin123', 10), role: 'admin',
-      balance: 1000, used_quota: 0, status: 'active',
-      created_at: new Date().toISOString(),
-    });
-    writeJSON('users.json', users);
-    console.log('\n================================================');
-    console.log('  Admin account created:');
-    console.log('  Username: admin');
-    console.log('  Password: admin123');
-    console.log('  Balance:  $1000 (for testing)');
-    console.log('============================================\n');
-  }
+// Payment config (QR code URLs)
+function getPaymentConfig() {
+  return readJSON('payment_config.json', { wechat_qr: '', alipay_qr: '', contact: '' });
+}
+function setPaymentConfig(cfg) {
+  writeJSON('payment_config.json', cfg);
 }
 
-// DB helper functions
+// ============ DB Helpers ============
 function findUser(by, val) {
-  const users = readJSON('users.json');
-  return users.find(u => u[by] === val && u.status === 'active');
+  return readJSON('users.json').find(u => u[by] === val && u.status === 'active');
 }
 function getUserById(id) {
-  const users = readJSON('users.json');
-  return users.find(u => u.id === id);
+  return readJSON('users.json').find(u => u.id === id);
 }
 function updateUser(id, updates) {
   const users = readJSON('users.json');
@@ -100,12 +86,10 @@ function updateUser(id, updates) {
 function getAllUsers() { return readJSON('users.json'); }
 
 function findToken(key) {
-  const tokens = readJSON('tokens.json');
-  return tokens.find(t => t.key === key && t.status === 'active');
+  return readJSON('tokens.json').find(t => t.key === key && t.status === 'active');
 }
 function getUserTokens(userId) {
-  const tokens = readJSON('tokens.json');
-  return tokens.filter(t => t.user_id === userId);
+  return readJSON('tokens.json').filter(t => t.user_id === userId);
 }
 function addToken(userId, name, quota_limit) {
   const tokens = readJSON('tokens.json');
@@ -132,35 +116,63 @@ function updateToken(id, userId, updates) {
   writeJSON('tokens.json', tokens);
 }
 
+// Recharge orders helpers
+function getRechargeOrders() { return readJSON('recharge_orders.json', []); }
+function saveRechargeOrders(orders) { writeJSON('recharge_orders.json', orders); }
+function addRechargeOrder(order) {
+  const orders = getRechargeOrders();
+  orders.push(order);
+  saveRechargeOrders(orders);
+  return order;
+}
+function updateRechargeOrder(id, updates) {
+  const orders = getRechargeOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx === -1) return null;
+  orders[idx] = { ...orders[idx], ...updates, updated_at: new Date().toISOString() };
+  saveRechargeOrders(orders);
+  return orders[idx];
+}
+
 function addUsageLog(userId, tokenId, model, inputTokens, outputTokens, cost) {
-  const logs = readJSON('usage_logs.json');
+  const logs = readJSON('usage_logs.json', []);
   logs.push({
     id: logs.length + 1, user_id: userId, token_id: tokenId, model,
     input_tokens: inputTokens, output_tokens: outputTokens,
     cost, status: 'success', created_at: new Date().toISOString(),
   });
-  // Keep only last 10000 logs to avoid file getting too large
   if (logs.length > 10000) logs.splice(0, logs.length - 10000);
   writeJSON('usage_logs.json', logs);
 }
-function getUserUsage(userId, days = 7) {
-  const logs = readJSON('usage_logs.json');
-  const since = new Date(Date.now() - days * 86400000).toISOString();
-  return logs.filter(l => l.user_id === userId && l.created_at >= since);
-}
+
 function getTotalUsage() {
-  const logs = readJSON('usage_logs.json');
-  return logs.reduce((sum, l) => sum + (l.cost || 0), 0);
+  return readJSON('usage_logs.json', []).reduce((sum, l) => sum + (l.cost || 0), 0);
 }
 function getTodayUsage() {
   const today = new Date().toISOString().split('T')[0];
-  const logs = readJSON('usage_logs.json');
-  return logs.filter(l => l.created_at.startsWith(today)).reduce((sum, l) => sum + (l.cost || 0), 0);
+  return readJSON('usage_logs.json', []).filter(l => l.created_at.startsWith(today)).reduce((sum, l) => sum + (l.cost || 0), 0);
 }
 function getTodayRequests() {
   const today = new Date().toISOString().split('T')[0];
-  const logs = readJSON('usage_logs.json');
-  return logs.filter(l => l.created_at.startsWith(today)).length;
+  return readJSON('usage_logs.json', []).filter(l => l.created_at.startsWith(today)).length;
+}
+
+// ============ Init Admin ============
+function initAdmin() {
+  const users = readJSON('users.json', []);
+  if (!users.find(u => u.role === 'admin')) {
+    users.push({
+      id: uuidv4(), username: 'admin', email: 'admin@localhost',
+      password: bcrypt.hashSync('admin123', 10), role: 'admin',
+      balance: 1000, used_quota: 0, status: 'active',
+      created_at: new Date().toISOString(),
+    });
+    writeJSON('users.json', users);
+    console.log('\n=========== Admin account created ===========');
+    console.log('  Username: admin');
+    console.log('  Password: admin123');
+    console.log('==============================================\n');
+  }
 }
 
 // ============ Middleware ============
@@ -168,7 +180,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -184,7 +195,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Auth middleware
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.token;
   if (!token) return res.status(401).json({ error: { message: 'Unauthorized' } });
@@ -225,12 +235,12 @@ app.post('/api/auth/register', (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) return res.status(400).json({ error: { message: 'All fields required' } });
   if (password.length < 6) return res.status(400).json({ error: { message: 'Password must be at least 6 characters' } });
-  const users = readJSON('users.json');
-  if (users.find(u => u.username === username || u.email === email)) {
+  if (readJSON('users.json', []).find(u => u.username === username || u.email === email)) {
     return res.status(409).json({ error: { message: 'Username or email already exists' } });
   }
   const userId = uuidv4();
   const hashedPassword = bcrypt.hashSync(password, 10);
+  const users = readJSON('users.json', []);
   users.push({
     id: userId, username, email,
     password: hashedPassword, role: 'user',
@@ -245,7 +255,7 @@ app.post('/api/auth/register', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: { message: 'Username and password required' } });
-  const user = readJSON('users.json').find(u => (u.username === username || u.email === username) && u.status === 'active');
+  const user = readJSON('users.json', []).find(u => (u.username === username || u.email === username) && u.status === 'active');
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: { message: 'Invalid credentials' } });
   }
@@ -269,8 +279,7 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 
 // ============ Token Management ============
 app.get('/api/tokens', authMiddleware, (req, res) => {
-  const tokens = getUserTokens(req.user.id);
-  res.json({ success: true, data: tokens });
+  res.json({ success: true, data: getUserTokens(req.user.id) });
 });
 
 app.post('/api/tokens', authMiddleware, (req, res) => {
@@ -292,13 +301,14 @@ app.put('/api/tokens/:id', authMiddleware, (req, res) => {
 // ============ Usage Stats ============
 app.get('/api/usage', authMiddleware, (req, res) => {
   const days = parseInt(req.query.days) || 7;
-  const logs = getUserUsage(req.user.id, days);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const logs = readJSON('usage_logs.json', []).filter(l => l.user_id === req.user.id && l.created_at >= since);
   res.json({ success: true, data: logs });
 });
 
 app.get('/api/usage/recent', authMiddleware, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
-  const logs = getUserUsage(req.user.id, 365).slice(-limit).reverse();
+  const logs = readJSON('usage_logs.json', []).filter(l => l.user_id === req.user.id).slice(-limit).reverse();
   res.json({ success: true, data: logs });
 });
 
@@ -315,24 +325,119 @@ app.get('/api/models', (req, res) => {
   res.json({ success: true, data: models });
 });
 
-// ============ Recharge ============
-app.post('/api/recharge', authMiddleware, (req, res) => {
-  const { amount } = req.body;
+// ============ PAYMENT CONFIG (Public) ============
+app.get('/api/payment/config', (req, res) => {
+  const cfg = getPaymentConfig();
+  // Only return public info (QR URLs and contact)
+  res.json({
+    success: true,
+    data: {
+      wechat_qr: cfg.wechat_qr || '',
+      alipay_qr: cfg.alipay_qr || '',
+      contact: cfg.contact || '',
+    }
+  });
+});
+
+// ============ PAYMENT CONFIG (Admin) ============
+app.post('/api/admin/payment/config', adminMiddleware, (req, res) => {
+  const { wechat_qr, alipay_qr, contact } = req.body;
+  const cfg = getPaymentConfig();
+  if (wechat_qr !== undefined) cfg.wechat_qr = wechat_qr;
+  if (alipay_qr !== undefined) cfg.alipay_qr = alipay_qr;
+  if (contact !== undefined) cfg.contact = contact;
+  setPaymentConfig(cfg);
+  res.json({ success: true, data: cfg });
+});
+
+// ============ RECHARGE FLOW ============
+
+// Step 1: User creates a recharge order (after scanning QR code and paying)
+app.post('/api/recharge/order', authMiddleware, (req, res) => {
+  const { amount, note } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: { message: 'Invalid amount' } });
-  updateUser(req.user.id, { balance: Math.round((req.user.balance + amount) * 1000000) / 1000000 });
-  res.json({ success: true, message: 'Recharge successful', new_balance: req.user.balance + amount });
+  
+  const order = {
+    id: uuidv4(),
+    user_id: req.user.id,
+    username: req.user.username,
+    amount: parseFloat(amount),
+    note: note || '',
+    status: 'pending',  // pending -> approved -> rejected
+    admin_note: '',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  addRechargeOrder(order);
+  res.json({ success: true, data: order });
+});
+
+// Step 2: User views their recharge orders
+app.get('/api/recharge/orders', authMiddleware, (req, res) => {
+  const orders = getRechargeOrders().filter(o => o.user_id === req.user.id).reverse();
+  res.json({ success: true, data: orders });
+});
+
+// Step 3: Admin views all pending orders
+app.get('/api/admin/recharge/orders', adminMiddleware, (req, res) => {
+  const status = req.query.status || 'pending';
+  const orders = getRechargeOrders().filter(o => status === 'all' || o.status === status).reverse();
+  res.json({ success: true, data: orders });
+});
+
+// Step 4: Admin approves a recharge order
+app.post('/api/admin/recharge/orders/:id/approve', adminMiddleware, (req, res) => {
+  const order = getRechargeOrders().find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: { message: 'Order not found' } });
+  if (order.status !== 'pending') return res.status(400).json({ error: { message: 'Order already processed' } });
+  
+  // Add balance to user
+  const user = getUserById(order.user_id);
+  if (user) {
+    updateUser(user.id, {
+      balance: Math.round((user.balance + order.amount) * 1000000) / 1000000,
+    });
+  }
+  
+  updateRechargeOrder(req.params.id, {
+    status: 'approved',
+    admin_note: req.body.note || '',
+  });
+  
+  res.json({ success: true, message: `Approved! $${order.amount} added to user ${order.username}` });
+});
+
+// Step 5: Admin rejects a recharge order
+app.post('/api/admin/recharge/orders/:id/reject', adminMiddleware, (req, res) => {
+  const order = getRechargeOrders().find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: { message: 'Order not found' } });
+  if (order.status !== 'pending') return res.status(400).json({ error: { message: 'Order already processed' } });
+  
+  updateRechargeOrder(req.params.id, {
+    status: 'rejected',
+    admin_note: req.body.note || '',
+  });
+  
+  res.json({ success: true, message: 'Order rejected' });
 });
 
 // ============ Admin Routes ============
 app.get('/api/admin/stats', adminMiddleware, (req, res) => {
+  const orders = getRechargeOrders();
+  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const approvedTotal = orders.filter(o => o.status === 'approved').reduce((s, o) => s + o.amount, 0);
+  
   res.json({
     success: true,
     data: {
       userCount: getAllUsers().length,
-      tokenCount: readJSON('tokens.json').length,
+      tokenCount: readJSON('tokens.json', []).length,
       totalUsage: Math.round(getTotalUsage() * 1000000) / 1000000,
       todayUsage: Math.round(getTodayUsage() * 1000000) / 1000000,
       todayRequests: getTodayRequests(),
+      pendingOrders,
+      approvedTotal: Math.round(approvedTotal * 1000000) / 1000000,
     }
   });
 });
@@ -429,10 +534,12 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
+  const orders = getRechargeOrders();
   res.json({
     success: true, status: 'ok',
     upstream_configured: !!CONFIG.upstream.apiKey,
     models_count: CONFIG.models.length,
+    pending_orders: orders.filter(o => o.status === 'pending').length,
     timestamp: new Date().toISOString(),
   });
 });
@@ -447,10 +554,10 @@ app.get('*', (req, res) => {
 
 // ============ Start ============
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n================================================`);
+  console.log(`\n==============================================`);
   console.log(`  AI API Gateway running on port ${PORT}`);
   console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`  Upstream configured: ${!!CONFIG.upstream.apiKey}`);
-  console.log(`============================================\n`);
+  console.log(`==============================================\n`);
   initAdmin();
 });

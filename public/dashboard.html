@@ -40,6 +40,9 @@
         <a class="dash-nav-item" data-page="docs" onclick="showPage('docs')">
             <span class="icon">[D]</span> 接入文档
         </a>
+        <a class="dash-nav-item" data-page="orders" onclick="showPage('orders')">
+            <span class="icon">[O]</span> 充值记录
+        </a>
     </div>
 
     <div class="dash-main">
@@ -64,7 +67,6 @@
                     <div class="value" id="statToday">0</div>
                 </div>
             </div>
-
             <div class="card" style="margin-top: 24px;">
                 <div class="card-header">
                     <div class="card-title">最近请求</div>
@@ -137,26 +139,86 @@
             </div>
         </div>
 
-        <!-- Recharge -->
+        <!-- Recharge (NEW FLOW) -->
         <div id="page-recharge" style="display:none;">
             <h1 style="font-size: 24px; margin-bottom: 24px;">充值</h1>
-            <div class="card" style="max-width: 480px;">
-                <div id="rechargeSuccess" class="form-success" style="display:none;"></div>
-                <div id="rechargeError" class="form-error" style="display:none;"></div>
+
+            <!-- Step 1: Select amount -->
+            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">第一步：选择充值金额</div>
                 <div class="form-group">
                     <label class="form-label">充值金额 ($)</label>
                     <input type="number" class="form-input" id="rechargeAmount" value="5" min="1" step="0.5">
                 </div>
-                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=1">$1</button>
-                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=5">$5</button>
-                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=10">$10</button>
-                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=50">$50</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <button class="btn btn-outline btn-sm" onclick="setAmount(1)">$1</button>
+                    <button class="btn btn-outline btn-sm" onclick="setAmount(5)">$5</button>
+                    <button class="btn btn-outline btn-sm" onclick="setAmount(10)">$10</button>
+                    <button class="btn btn-outline btn-sm" onclick="setAmount(50)">$50</button>
                 </div>
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-                    当前为测试模式，点击充值将直接到账。正式上线后会接入微信/支付宝支付。
-                </p>
-                <button class="btn btn-primary btn-block" onclick="doRecharge()">充值</button>
+            </div>
+
+            <!-- Step 2: Show QR codes -->
+            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">第二步：扫码付款</div>
+                <div id="qrCodes" style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px;">
+                    <div id="wechatQrBox" style="text-align: center; display: none;">
+                        <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">微信支付</p>
+                        <img id="wechatQr" style="width: 180px; height: 180px; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: white; padding: 8px;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">微信扫码付款</p>
+                    </div>
+                    <div id="alipayQrBox" style="text-align: center; display: none;">
+                        <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">支付宝</p>
+                        <img id="alipayQr" style="width: 180px; height: 180px; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: white; padding: 8px;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">支付宝扫码付款</p>
+                    </div>
+                    <div id="noQrMsg" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">
+                        正在加载收款码...
+                    </div>
+                </div>
+                <div id="paymentContact" style="text-align: center; font-size: 13px; color: var(--text-muted); display: none; margin-bottom: 12px;"></div>
+                <div style="background: var(--bg-soft); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-muted); line-height: 1.8;">
+                    <p>📌 充值说明：</p>
+                    <p>1. 选择金额，扫码付款 <strong>相同金额</strong></p>
+                    <p>2. 付款后在下方填写备注（建议填用户名或邮箱）</p>
+                    <p>3. 提交后等待管理员审核，通常 5-30 分钟内到账</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Submit proof -->
+            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">第三步：提交充值申请</div>
+                <div class="form-group">
+                    <label class="form-label">付款金额 ($)</label>
+                    <input type="text" class="form-input" id="proofAmount" readonly style="background: var(--bg-soft);">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">付款备注 <span style="color: var(--text-muted); font-weight: normal;">（选填，如微信/支付宝账号、转账说明等）</span></label>
+                    <input type="text" class="form-input" id="proofNote" placeholder="例：微信支付，用户名 hcf8822">
+                </div>
+                <div id="rechargeMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+                <button class="btn btn-primary btn-block" id="submitOrderBtn" onclick="submitRechargeOrder()">我已付款，提交审核</button>
+            </div>
+        </div>
+
+        <!-- Orders History -->
+        <div id="page-orders" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">充值记录</h1>
+            <div id="ordersMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>金额</th>
+                            <th>备注</th>
+                            <th>状态</th>
+                            <th>管理员备注</th>
+                            <th>申请时间</th>
+                            <th>处理时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersBody"></tbody>
+                </table>
             </div>
         </div>
 
@@ -172,22 +234,22 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="sk-你的令牌",
-    base_url="http://localhost:3000/v1"
+    base_url="https://ai-api-gateway-dmyn.onrender.com/v1"
 )
 
 response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4o-mini",
     messages=[{"role": "user", "content": "你好"}]
 )
 print(response.choices[0].message.content)
                 </pre>
                 <h3 style="margin-bottom: 16px;">cURL 示例</h3>
                 <pre style="background: #1E293B; color: #E2E8F0; padding: 20px; border-radius: 8px; font-size: 13px; line-height: 1.7; overflow-x: auto;">
-curl http://localhost:3000/v1/chat/completions \
+curl https://ai-api-gateway-dmyn.onrender.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sk-你的令牌" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
                 </pre>
@@ -238,9 +300,17 @@ function showPage(page) {
     document.getElementById('page-' + page).style.display = 'block';
     document.querySelectorAll('.dash-nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
+    
+    if (page === 'recharge') loadPaymentConfig();
+    if (page === 'orders') loadOrders();
 }
 
-// Load user info
+function setAmount(amount) {
+    document.getElementById('rechargeAmount').value = amount;
+    document.getElementById('proofAmount').value = '$' + amount;
+}
+
+// ============ Load user info ============
 async function loadUser() {
     try {
         const res = await fetch('/api/auth/me', { headers: authHeaders() });
@@ -255,7 +325,7 @@ async function loadUser() {
     } catch(e) { console.error(e); }
 }
 
-// Load tokens
+// ============ Load tokens ============
 async function loadTokens() {
     try {
         const res = await fetch('/api/tokens', { headers: authHeaders() });
@@ -283,7 +353,7 @@ async function loadTokens() {
     } catch(e) { console.error(e); }
 }
 
-// Load usage
+// ============ Load usage ============
 async function loadUsage() {
     try {
         const res = await fetch('/api/usage/recent?limit=50', { headers: authHeaders() });
@@ -317,7 +387,7 @@ async function loadUsage() {
     } catch(e) { console.error(e); }
 }
 
-// Load models
+// ============ Load models ============
 async function loadModels() {
     try {
         const res = await fetch('/api/models');
@@ -337,7 +407,7 @@ async function loadModels() {
     } catch(e) { console.error(e); }
 }
 
-// Token management
+// ============ Token management ============
 function showCreateTokenModal() {
     document.getElementById('tokenModal').classList.add('show');
 }
@@ -373,32 +443,125 @@ async function deleteToken(id) {
     } catch(e) { alert('删除失败'); }
 }
 
-// Recharge
-async function doRecharge() {
-    const amount = parseFloat(document.getElementById('rechargeAmount').value);
-    if (!amount || amount <= 0) return;
-    const errEl = document.getElementById('rechargeError');
-    const sucEl = document.getElementById('rechargeSuccess');
-    errEl.style.display = 'none';
-    sucEl.style.display = 'none';
+// ============ PAYMENT CONFIG & RECHARGE ============
+async function loadPaymentConfig() {
     try {
-        const res = await fetch('/api/recharge', {
-            method: 'POST', headers: authHeaders(),
-            body: JSON.stringify({ amount })
-        });
+        const res = await fetch('/api/payment/config');
         const data = await res.json();
         if (data.success) {
-            sucEl.textContent = `充值成功！到账 $${amount}，当前余额 $${data.new_balance.toFixed(2)}`;
-            sucEl.style.display = 'block';
-            loadUser();
-        } else {
-            throw new Error(data.error?.message || 'Recharge failed');
+            const wechatBox = document.getElementById('wechatQrBox');
+            const alipayBox = document.getElementById('alipayQrBox');
+            const noQrMsg = document.getElementById('noQrMsg');
+            const contactEl = document.getElementById('paymentContact');
+            
+            let hasQr = false;
+            if (data.data.wechat_qr) {
+                document.getElementById('wechatQr').src = data.data.wechat_qr;
+                wechatBox.style.display = 'block';
+                hasQr = true;
+            }
+            if (data.data.alipay_qr) {
+                document.getElementById('alipayQr').src = data.data.alipay_qr;
+                alipayBox.style.display = 'block';
+                hasQr = true;
+            }
+            if (data.data.contact) {
+                contactEl.style.display = 'block';
+                contactEl.innerHTML = '如有问题请联系管理员：' + data.data.contact;
+            }
+            if (!hasQr) {
+                noQrMsg.textContent = '收款码暂未配置，请联系管理员。';
+                noQrMsg.style.display = 'block';
+            } else {
+                noQrMsg.style.display = 'none';
+            }
         }
-    } catch(e) {
-        errEl.textContent = e.message;
-        errEl.style.display = 'block';
-    }
+    } catch(e) { console.error(e); }
 }
+
+function submitRechargeOrder() {
+    const amount = parseFloat(document.getElementById('rechargeAmount').value);
+    const note = document.getElementById('proofNote').value || '';
+    if (!amount || amount <= 0) return alert('请输入有效金额');
+    
+    const msgEl = document.getElementById('rechargeMsg');
+    msgEl.style.display = 'none';
+    
+    fetch('/api/recharge/order', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ amount, note })
+    })
+    .then(r => r.json())
+    .then(data => {
+        msgEl.style.display = 'block';
+        if (data.success) {
+            msgEl.style.background = '#065F4615';
+            msgEl.style.color = '#059669';
+            msgEl.style.border = '1px solid #059669';
+            msgEl.innerHTML = `<strong>✅ 充值申请已提交！</strong><br>金额：$${amount}<br>请等待管理员审核，通常 5-30 分钟内到账。<br>你可以在「充值记录」页面查看进度。`;
+            document.getElementById('submitOrderBtn').disabled = true;
+            document.getElementById('submitOrderBtn').textContent = '已提交，等待审核...';
+            setTimeout(() => { showPage('orders'); }, 2000);
+        } else {
+            msgEl.style.background = '#EF444415';
+            msgEl.style.color = '#EF4444';
+            msgEl.style.border = '1px solid #EF4444';
+            msgEl.textContent = data.error?.message || '提交失败';
+        }
+    })
+    .catch(e => {
+        msgEl.style.display = 'block';
+        msgEl.style.background = '#EF444415';
+        msgEl.style.color = '#EF4444';
+        msgEl.style.border = '1px solid #EF4444';
+        msgEl.textContent = '提交失败，请重试';
+    });
+}
+
+// ============ Orders ============
+async function loadOrders() {
+    try {
+        const res = await fetch('/api/recharge/orders', { headers: authHeaders() });
+        const data = await res.json();
+        const msgEl = document.getElementById('ordersMsg');
+        if (data.success) {
+            const pending = data.data.filter(o => o.status === 'pending').length;
+            if (pending > 0) {
+                msgEl.style.display = 'block';
+                msgEl.style.background = '#F59E0B15';
+                msgEl.style.color = '#D97706';
+                msgEl.style.border = '1px solid #D97706';
+                msgEl.innerHTML = `你有 <strong>${pending}</strong> 笔充值申请待审核，到账后我们会通过邮件或站内通知你。`;
+            }
+            const body = document.getElementById('ordersBody');
+            if (data.data.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:40px;">暂无充值记录</td></tr>';
+                return;
+            }
+            body.innerHTML = data.data.map(o => {
+                const statusMap = { pending: '待审核', approved: '已到账', rejected: '已拒绝' };
+                const statusColor = { pending: 'tag-yellow', approved: 'tag-green', rejected: 'tag-red' };
+                return `
+                <tr>
+                    <td style="font-weight:600;">$${(o.amount||0).toFixed(2)}</td>
+                    <td style="font-size:13px;">${o.note || '-'}</td>
+                    <td><span class="tag ${statusColor[o.status]||'tag-yellow'}">${statusMap[o.status]||o.status}</span></td>
+                    <td style="font-size:13px; color:var(--text-muted);">${o.admin_note || '-'}</td>
+                    <td style="font-size:12px; color:var(--text-muted);">${o.created_at}</td>
+                    <td style="font-size:12px; color:var(--text-muted);">${o.updated_at !== o.created_at ? o.updated_at : '-'}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Watch amount change to sync proof amount
+const amountInput = document.getElementById('rechargeAmount');
+amountInput.addEventListener('input', function() {
+    document.getElementById('proofAmount').value = '$' + (parseFloat(this.value) || 0);
+});
 
 // Init
 loadUser();
