@@ -3,18 +3,16 @@ services:
     name: ai-api-gateway
     env: node
     plan: free
-    region: oregon  # 可选：oregon / virginia / frankfurt / singapore
+    region: oregon
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: UPSTREAM_API_KEY
-        sync: false   # 部署后在 Render 控制台手动填写
+        sync: false
       - key: UPSTREAM_BASE_URL
         value: https://api.quickrouter.ai
       - key: JWT_SECRET
         generateValue: true
-      - key: PORT
-        value: 3000
     buildCommand: npm install
     healthCheckPath: /api/health
