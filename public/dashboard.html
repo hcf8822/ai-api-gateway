@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控制台 - AIHub</title>
+    <link rel="stylesheet" href="common.css">
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+    <div class="nav-inner">
+        <div class="logo" onclick="location.href='index.html'">AI<span>Hub</span></div>
+        <div class="nav-right">
+            <div class="nav-user" id="navUser"></div>
+            <button class="btn btn-outline btn-sm" onclick="logout()">退出</button>
+        </div>
+    </div>
+</div>
+
+<!-- Dashboard -->
+<div class="dash-wrap">
+    <div class="dash-sidebar">
+        <a class="dash-nav-item active" data-page="overview" onclick="showPage('overview')">
+            <span class="icon">[~]</span> 概览
+        </a>
+        <a class="dash-nav-item" data-page="tokens" onclick="showPage('tokens')">
+            <span class="icon">[K]</span> API 令牌
+        </a>
+        <a class="dash-nav-item" data-page="usage" onclick="showPage('usage')">
+            <span class="icon">[U]</span> 用量明细
+        </a>
+        <a class="dash-nav-item" data-page="models" onclick="showPage('models')">
+            <span class="icon">[M]</span> 模型价格
+        </a>
+        <a class="dash-nav-item" data-page="recharge" onclick="showPage('recharge')">
+            <span class="icon">[$]</span> 充值
+        </a>
+        <a class="dash-nav-item" data-page="docs" onclick="showPage('docs')">
+            <span class="icon">[D]</span> 接入文档
+        </a>
+    </div>
+
+    <div class="dash-main">
+        <!-- Overview -->
+        <div id="page-overview">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">概览</h1>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">账户余额</div>
+                    <div class="value" id="statBalance">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">累计消费</div>
+                    <div class="value" id="statUsed">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">API 令牌</div>
+                    <div class="value" id="statTokens">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">今日请求</div>
+                    <div class="value" id="statToday">0</div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 24px;">
+                <div class="card-header">
+                    <div class="card-title">最近请求</div>
+                    <a href="#" onclick="showPage('usage');return false;" style="font-size: 13px;">查看全部</a>
+                </div>
+                <div id="recentUsage"></div>
+            </div>
+        </div>
+
+        <!-- Tokens -->
+        <div id="page-tokens" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="font-size: 24px;">API 令牌</h1>
+                <button class="btn btn-primary" onclick="showCreateTokenModal()">创建令牌</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>名称</th>
+                            <th>Key</th>
+                            <th>额度限制</th>
+                            <th>已用</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tokensBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Usage -->
+        <div id="page-usage" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">用量明细</h1>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>模型</th>
+                            <th>输入 Token</th>
+                            <th>输出 Token</th>
+                            <th>费用</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usageBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Models -->
+        <div id="page-models" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">模型价格</h1>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>模型</th>
+                            <th>提供商</th>
+                            <th>输入 ($/M)</th>
+                            <th>输出 ($/M)</th>
+                            <th>上下文</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modelsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recharge -->
+        <div id="page-recharge" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">充值</h1>
+            <div class="card" style="max-width: 480px;">
+                <div id="rechargeSuccess" class="form-success" style="display:none;"></div>
+                <div id="rechargeError" class="form-error" style="display:none;"></div>
+                <div class="form-group">
+                    <label class="form-label">充值金额 ($)</label>
+                    <input type="number" class="form-input" id="rechargeAmount" value="5" min="1" step="0.5">
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=1">$1</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=5">$5</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=10">$10</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('rechargeAmount').value=50">$50</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                    当前为测试模式，点击充值将直接到账。正式上线后会接入微信/支付宝支付。
+                </p>
+                <button class="btn btn-primary btn-block" onclick="doRecharge()">充值</button>
+            </div>
+        </div>
+
+        <!-- Docs -->
+        <div id="page-docs" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">接入文档</h1>
+            <div class="card">
+                <h3 style="margin-bottom: 16px;">快速开始</h3>
+                <p style="margin-bottom: 12px;">1. 在「API 令牌」页面创建一个令牌，获取 <code>sk-xxx</code> 格式的 Key</p>
+                <p style="margin-bottom: 12px;">2. 使用以下配置调用 API：</p>
+                <pre style="background: #1E293B; color: #E2E8F0; padding: 20px; border-radius: 8px; font-size: 13px; line-height: 1.7; overflow-x: auto; margin-bottom: 24px;">
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-你的令牌",
+    base_url="http://localhost:3000/v1"
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "你好"}]
+)
+print(response.choices[0].message.content)
+                </pre>
+                <h3 style="margin-bottom: 16px;">cURL 示例</h3>
+                <pre style="background: #1E293B; color: #E2E8F0; padding: 20px; border-radius: 8px; font-size: 13px; line-height: 1.7; overflow-x: auto;">
+curl http://localhost:3000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-你的令牌" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+                </pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Token Modal -->
+<div class="modal-overlay" id="tokenModal">
+    <div class="modal">
+        <div class="modal-title">创建 API 令牌</div>
+        <div class="form-group">
+            <label class="form-label">令牌名称</label>
+            <input type="text" class="form-input" id="tokenName" placeholder="如：我的应用">
+        </div>
+        <div class="form-group">
+            <label class="form-label">额度限制 ($, 0 = 不限)</label>
+            <input type="number" class="form-input" id="tokenQuota" value="0" min="0" step="0.5">
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+            <button class="btn btn-outline btn-block" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary btn-block" onclick="createToken()">创建</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+
+if (!token) {
+    window.location.href = 'login.html';
+}
+
+function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+}
+
+function showPage(page) {
+    document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
+    document.getElementById('page-' + page).style.display = 'block';
+    document.querySelectorAll('.dash-nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`[data-page="${page}"]`).classList.add('active');
+}
+
+// Load user info
+async function loadUser() {
+    try {
+        const res = await fetch('/api/auth/me', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('navUser').innerHTML =
+                `<span class="nav-balance">$${data.user.balance.toFixed(2)}</span>` +
+                `<span style="font-size: 14px; color: var(--text-muted);">${data.user.username}</span>`;
+            document.getElementById('statBalance').textContent = '$' + data.user.balance.toFixed(2);
+            document.getElementById('statUsed').textContent = '$' + (data.user.used_quota || 0).toFixed(4);
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Load tokens
+async function loadTokens() {
+    try {
+        const res = await fetch('/api/tokens', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('statTokens').textContent = data.data.length;
+            const body = document.getElementById('tokensBody');
+            if (data.data.length === 0) {
+                body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:40px;">还没有令牌，点击右上角创建</td></tr>';
+                return;
+            }
+            body.innerHTML = data.data.map(t => `
+                <tr>
+                    <td>${t.name}</td>
+                    <td><span class="key-box">${t.key.substring(0,12)}...${t.key.slice(-4)}</span></td>
+                    <td>${t.quota_limit > 0 ? '$' + t.quota_limit : '不限'}</td>
+                    <td>$${(t.used_quota||0).toFixed(4)}</td>
+                    <td><span class="tag ${t.status==='active'?'tag-green':'tag-red'}">${t.status==='active'?'活跃':'停用'}</span></td>
+                    <td style="font-size:12px; color:var(--text-muted);">${t.created_at}</td>
+                    <td><button class="btn btn-outline btn-sm" onclick="copyKey('${t.key}')">复制</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteToken('${t.id}')">删除</button></td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Load usage
+async function loadUsage() {
+    try {
+        const res = await fetch('/api/usage/recent?limit=50', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('statToday').textContent = data.data.filter(l => l.created_at.startsWith(new Date().toISOString().split('T')[0])).length;
+            const body = document.getElementById('usageBody');
+            if (data.data.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:40px;">暂无使用记录</td></tr>';
+                return;
+            }
+            body.innerHTML = data.data.map(l => `
+                <tr>
+                    <td style="font-size:12px;">${l.created_at}</td>
+                    <td>${l.model}</td>
+                    <td>${l.input_tokens}</td>
+                    <td>${l.output_tokens}</td>
+                    <td>$${(l.cost||0).toFixed(6)}</td>
+                    <td><span class="tag ${l.status==='success'?'tag-green':'tag-red'}">${l.status}</span></td>
+                </tr>
+            `).join('');
+            document.getElementById('recentUsage').innerHTML = data.data.slice(0,5).map(l => `
+                <div style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--bg-soft); font-size:13px;">
+                    <span>${l.model}</span>
+                    <span style="color:var(--text-muted);">${l.input_tokens + l.output_tokens} tokens</span>
+                    <span>$${(l.cost||0).toFixed(6)}</span>
+                    <span style="color:var(--text-muted); font-size:12px;">${l.created_at}</span>
+                </div>
+            `).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Load models
+async function loadModels() {
+    try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        if (data.success) {
+            const body = document.getElementById('modelsBody');
+            body.innerHTML = data.data.map(m => `
+                <tr>
+                    <td><strong>${m.id}</strong></td>
+                    <td>${m.provider}</td>
+                    <td>$${m.input_price}</td>
+                    <td>$${m.output_price}</td>
+                    <td>${m.context}</td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Token management
+function showCreateTokenModal() {
+    document.getElementById('tokenModal').classList.add('show');
+}
+function closeModal() {
+    document.getElementById('tokenModal').classList.remove('show');
+}
+async function createToken() {
+    const name = document.getElementById('tokenName').value || 'default';
+    const quota = parseFloat(document.getElementById('tokenQuota').value) || 0;
+    try {
+        const res = await fetch('/api/tokens', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ name, quota_limit: quota })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal();
+            loadTokens();
+            alert('令牌创建成功！\n\n你的 API Key:\n' + data.data.key);
+        }
+    } catch(e) { alert('创建失败'); }
+}
+function copyKey(key) {
+    navigator.clipboard.writeText(key);
+    alert('已复制到剪贴板');
+}
+async function deleteToken(id) {
+    if (!confirm('确定删除此令牌？')) return;
+    try {
+        await fetch('/api/tokens/' + id, { method: 'DELETE', headers: authHeaders() });
+        loadTokens();
+    } catch(e) { alert('删除失败'); }
+}
+
+// Recharge
+async function doRecharge() {
+    const amount = parseFloat(document.getElementById('rechargeAmount').value);
+    if (!amount || amount <= 0) return;
+    const errEl = document.getElementById('rechargeError');
+    const sucEl = document.getElementById('rechargeSuccess');
+    errEl.style.display = 'none';
+    sucEl.style.display = 'none';
+    try {
+        const res = await fetch('/api/recharge', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ amount })
+        });
+        const data = await res.json();
+        if (data.success) {
+            sucEl.textContent = `充值成功！到账 $${amount}，当前余额 $${data.new_balance.toFixed(2)}`;
+            sucEl.style.display = 'block';
+            loadUser();
+        } else {
+            throw new Error(data.error?.message || 'Recharge failed');
+        }
+    } catch(e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    }
+}
+
+// Init
+loadUser();
+loadTokens();
+loadUsage();
+loadModels();
+</script>
+
+</body>
+</html>

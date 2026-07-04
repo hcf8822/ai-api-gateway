@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIHub - 一站式 AI API 服务</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #4F46E5;
+            --primary-light: #EEF2FF;
+            --text: #1F2937;
+            --text-muted: #6B7280;
+            --bg: #FFFFFF;
+            --bg-soft: #F9FAFB;
+            --border: #E5E7EB;
+            --green: #10B981;
+            --coral: #EF4444;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.6;
+        }
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Nav */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+        }
+        .nav-inner {
+            max-width: 1080px; margin: 0 auto; padding: 0 24px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .logo { font-size: 20px; font-weight: 700; color: var(--text); }
+        .logo span { color: var(--primary); }
+        .nav-links { display: flex; gap: 32px; align-items: center; }
+        .nav-links a { color: var(--text-muted); font-size: 14px; }
+        .nav-links a:hover { color: var(--primary); text-decoration: none; }
+        .btn {
+            display: inline-block; padding: 10px 24px; border-radius: 8px;
+            font-size: 14px; font-weight: 500; cursor: pointer; border: none;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: #4338CA; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* Hero */
+        .hero {
+            padding: 140px 24px 80px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 48px; font-weight: 700; line-height: 1.2;
+            max-width: 720px; margin: 0 auto 20px;
+        }
+        .hero h1 span { color: var(--primary); }
+        .hero p {
+            font-size: 18px; color: var(--text-muted);
+            max-width: 560px; margin: 0 auto 36px;
+        }
+        .hero-btns { display: flex; gap: 16px; justify-content: center; }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--primary-light); color: var(--primary);
+            padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+            margin-bottom: 24px;
+        }
+        .hero-badge::before {
+            content: ""; width: 8px; height: 8px; background: var(--green);
+            border-radius: 50%; display: inline-block;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex; justify-content: center; gap: 64px;
+            padding: 40px 24px; max-width: 800px; margin: 0 auto;
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+        }
+        .stat { text-align: center; }
+        .stat-num { font-size: 36px; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Features */
+        .section { max-width: 1080px; margin: 0 auto; padding: 80px 24px; }
+        .section-title { text-align: center; margin-bottom: 56px; }
+        .section-title h2 { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+        .section-title p { font-size: 16px; color: var(--text-muted); }
+        .features-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+        }
+        .feature-card {
+            padding: 32px; border: 1px solid var(--border); border-radius: 12px;
+            background: var(--bg);
+        }
+        .feature-card:hover { border-color: var(--primary); }
+        .feature-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            background: var(--primary-light); color: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; margin-bottom: 16px;
+        }
+        .feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .feature-card p { font-size: 14px; color: var(--text-muted); }
+
+        /* Pricing */
+        .pricing-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+        }
+        .price-card {
+            padding: 36px 32px; border: 1px solid var(--border); border-radius: 16px;
+            background: var(--bg); position: relative;
+        }
+        .price-card.popular {
+            border-color: var(--primary); border-width: 2px;
+            box-shadow: 0 4px 24px rgba(79,70,229,0.08);
+        }
+        .price-badge {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); color: #fff; font-size: 12px; font-weight: 500;
+            padding: 4px 16px; border-radius: 12px; white-space: nowrap;
+        }
+        .price-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .price-card .desc { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+        .price-amount { font-size: 40px; font-weight: 700; }
+        .price-amount small { font-size: 14px; font-weight: 400; color: var(--text-muted); }
+        .price-features { list-style: none; margin: 24px 0; }
+        .price-features li {
+            font-size: 14px; color: var(--text); padding: 8px 0;
+            border-bottom: 1px solid var(--bg-soft);
+        }
+        .price-features li:last-child { border: none; }
+        .price-features li::before {
+            content: ""; display: inline-block; width: 16px; height: 16px;
+            background: var(--green); border-radius: 50%; margin-right: 10px;
+            vertical-align: middle; position: relative; top: -1px;
+        }
+        .price-features li.no::before { background: var(--border); }
+
+        /* Models */
+        .models-table {
+            width: 100%; border-collapse: collapse; font-size: 14px;
+        }
+        .models-table th {
+            text-align: left; padding: 12px 16px; background: var(--bg-soft);
+            font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border);
+        }
+        .models-table td {
+            padding: 14px 16px; border-bottom: 1px solid var(--border);
+        }
+        .models-table tr:hover { background: var(--bg-soft); }
+        .tag {
+            display: inline-block; padding: 2px 10px; border-radius: 4px;
+            font-size: 12px; font-weight: 500;
+        }
+        .tag-blue { background: #DBEAFE; color: #1E40AF; }
+        .tag-purple { background: #EDE9FE; color: #5B21B6; }
+        .tag-green { background: #D1FAE5; color: #065F46; }
+        .tag-amber { background: #FEF3C7; color: #92400E; }
+
+        /* Code */
+        .code-block {
+            background: #1E293B; color: #E2E8F0; border-radius: 12px;
+            padding: 24px; font-family: "JetBrains Mono", "Fira Code", monospace;
+            font-size: 13px; line-height: 1.7; overflow-x: auto;
+            max-width: 720px; margin: 0 auto;
+        }
+        .code-block .comment { color: #64748B; }
+        .code-block .keyword { color: #818CF8; }
+        .code-block .string { color: #34D399; }
+
+        /* CTA */
+        .cta {
+            text-align: center; padding: 80px 24px;
+            background: var(--primary-light); margin: 0;
+        }
+        .cta h2 { font-size: 32px; font-weight: 700; margin-bottom: 16px; }
+        .cta p { font-size: 16px; color: var(--text-muted); margin-bottom: 32px; }
+
+        /* Footer */
+        footer {
+            background: #111827; color: #9CA3AF; padding: 48px 24px 24px;
+        }
+        .footer-inner {
+            max-width: 1080px; margin: 0 auto;
+            display: flex; justify-content: space-between; flex-wrap: wrap; gap: 32px;
+        }
+        .footer-brand .logo { color: #fff; margin-bottom: 12px; }
+        .footer-brand p { font-size: 13px; max-width: 280px; }
+        .footer-links { display: flex; gap: 48px; }
+        .footer-col h4 { color: #fff; font-size: 14px; margin-bottom: 12px; }
+        .footer-col a { display: block; color: #9CA3AF; font-size: 13px; margin-bottom: 8px; }
+        .footer-col a:hover { color: #fff; text-decoration: none; }
+        .footer-bottom {
+            max-width: 1080px; margin: 32px auto 0; padding-top: 24px;
+            border-top: 1px solid #374151; font-size: 12px; text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; }
+            .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+            .stats { flex-direction: column; gap: 24px; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <div class="logo">AI<span>Hub</span></div>
+        <div class="nav-links">
+            <a href="#features">功能</a>
+            <a href="#pricing">定价</a>
+            <a href="#models">模型</a>
+            <a href="#docs">文档</a>
+            <a href="/login" class="btn btn-outline">登录</a>
+            <a href="/register" class="btn btn-primary">注册</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-badge">服务运行中 · 99.9% 可用</div>
+    <h1>一个 Key，直连 <span>300+ AI 模型</span></h1>
+    <p>兼容 OpenAI 接口标准，国内毫秒级响应。无需翻墙，无需海外信用卡，开箱即用。</p>
+    <div class="hero-btns">
+        <a href="/register" class="btn btn-primary">免费注册 · 送 $1 额度</a>
+        <a href="#pricing" class="btn btn-outline">查看定价</a>
+    </div>
+</section>
+
+<!-- Stats -->
+<section class="stats">
+    <div class="stat">
+        <div class="stat-num">300+</div>
+        <div class="stat-label">支持模型</div>
+    </div>
+    <div class="stat">
+        <div class="stat-num">99.9%</div>
+        <div class="stat-label">服务可用性</div>
+    </div>
+    <div class="stat">
+        <div class="stat-num">50ms</div>
+        <div class="stat-label">平均延迟</div>
+    </div>
+    <div class="stat">
+        <div class="stat-num">7x24</div>
+        <div class="stat-label">技术支持</div>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+    <div class="section-title">
+        <h2>为什么选择 AIHub</h2>
+        <p>专为中文开发者打造的 AI API 中转服务</p>
+    </div>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon">1</div>
+            <h3>统一接口</h3>
+            <p>兼容 OpenAI SDK，一个 Key 调用所有模型。换模型只需改一个参数，代码零改动。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">2</div>
+            <h3>国内直连</h3>
+            <p>无需代理，国内服务器直连。延迟低至 50ms，比直连官方快 3-5 倍。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">3</div>
+            <h3>弹性计费</h3>
+            <p>按 Token 精确计费，用多少付多少。支持充值余额、令牌额度管理、用量监控。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">4</div>
+            <h3>多模型支持</h3>
+            <p>GPT-4o、Claude、Gemini、DeepSeek、Grok、GLM 等主流模型全覆盖，持续更新。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">5</div>
+            <h3>稳定可靠</h3>
+            <p>多节点负载均衡，自动故障切换。99.9% SLA 保障，服务不中断。</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">6</div>
+            <h3>中文支持</h3>
+            <p>全中文后台界面、文档和客服。微信群实时答疑，新手也能快速上手。</p>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing -->
+<section class="section" id="pricing" style="background: var(--bg-soft);">
+    <div class="section-title">
+        <h2>透明定价</h2>
+        <p>按量付费，无需包月。比官方便宜 30%-70%</p>
+    </div>
+    <div class="pricing-grid">
+        <div class="price-card">
+            <h3>入门版</h3>
+            <p class="desc">适合个人开发者尝鲜</p>
+            <div class="price-amount">¥0<small> /月起</small></div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">注册送 $1 免费额度</p>
+            <ul class="price-features">
+                <li>支持全部模型</li>
+                <li>最高 60 RPM</li>
+                <li>社区支持</li>
+                <li class="no">优先队列</li>
+                <li class="no">专属客服</li>
+            </ul>
+            <a href="/register" class="btn btn-outline" style="width: 100%; text-align: center;">免费注册</a>
+        </div>
+        <div class="price-card popular">
+            <div class="price-badge">推荐</div>
+            <h3>标准版</h3>
+            <p class="desc">适合日常开发和小型应用</p>
+            <div class="price-amount">¥29<small> /月起</small></div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">含 $5 等值额度</p>
+            <ul class="price-features">
+                <li>支持全部模型</li>
+                <li>最高 200 RPM</li>
+                <li>优先队列</li>
+                <li>用量监控告警</li>
+                <li>微信群支持</li>
+            </ul>
+            <a href="/register" class="btn btn-primary" style="width: 100%; text-align: center;">立即开通</a>
+        </div>
+        <div class="price-card">
+            <h3>企业版</h3>
+            <p class="desc">适合高并发商业项目</p>
+            <div class="price-amount">联系<small> 我们</small></div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">定制方案，量价更优</p>
+            <ul class="price-features">
+                <li>支持全部模型</li>
+                <li>不限 RPM</li>
+                <li>最高优先级队列</li>
+                <li>专属技术支持</li>
+                <li>SLA 保障</li>
+            </ul>
+            <a href="#contact" class="btn btn-outline" style="width: 100%; text-align: center;">联系我们</a>
+        </div>
+    </div>
+</section>
+
+<!-- Models -->
+<section class="section" id="models">
+    <div class="section-title">
+        <h2>热门模型价格</h2>
+        <p>以下为部分模型定价，完整列表请登录后台查看</p>
+    </div>
+    <div style="overflow-x: auto;">
+        <table class="models-table">
+            <thead>
+                <tr>
+                    <th>模型</th>
+                    <th>提供商</th>
+                    <th>输入价格</th>
+                    <th>输出价格</th>
+                    <th>上下文</th>
+                    <th>标签</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>gpt-4o</strong></td>
+                    <td>OpenAI</td>
+                    <td>¥17.5 /百万Token</td>
+                    <td>¥70 /百万Token</td>
+                    <td>128K</td>
+                    <td><span class="tag tag-blue">推荐</span></td>
+                </tr>
+                <tr>
+                    <td><strong>gpt-4o-mini</strong></td>
+                    <td>OpenAI</td>
+                    <td>¥1.05 /百万Token</td>
+                    <td>¥4.2 /百万Token</td>
+                    <td>128K</td>
+                    <td><span class="tag tag-green">高性价比</span></td>
+                </tr>
+                <tr>
+                    <td><strong>claude-sonnet-4</strong></td>
+                    <td>Anthropic</td>
+                    <td>¥14 /百万Token</td>
+                    <td>¥70 /百万Token</td>
+                    <td>200K</td>
+                    <td><span class="tag tag-purple">强推理</span></td>
+                </tr>
+                <tr>
+                    <td><strong>gemini-2.0-flash</strong></td>
+                    <td>Google</td>
+                    <td>¥0.7 /百万Token</td>
+                    <td>¥2.8 /百万Token</td>
+                    <td>1M</td>
+                    <td><span class="tag tag-green">超低价</span></td>
+                </tr>
+                <tr>
+                    <td><strong>deepseek-chat</strong></td>
+                    <td>DeepSeek</td>
+                    <td>¥1.0 /百万Token</td>
+                    <td>¥2.0 /百万Token</td>
+                    <td>64K</td>
+                    <td><span class="tag tag-amber">国产之光</span></td>
+                </tr>
+                <tr>
+                    <td><strong>grok-2</strong></td>
+                    <td>xAI</td>
+                    <td>¥14 /百万Token</td>
+                    <td>¥42 /百万Token</td>
+                    <td>128K</td>
+                    <td><span class="tag tag-blue">新上线</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p style="text-align: center; margin-top: 24px; font-size: 14px; color: var(--text-muted);">
+        * 以上为示例价格，实际定价以后台实时显示为准。1 美元 = 7 元人民币。
+    </p>
+</section>
+
+<!-- Quick Start -->
+<section class="section" id="docs" style="background: var(--bg-soft);">
+    <div class="section-title">
+        <h2>3 分钟快速接入</h2>
+        <p>兼容 OpenAI SDK，只需修改两行代码</p>
+    </div>
+    <div class="code-block">
+<span class="comment"># 1. 安装 SDK</span>
+pip install openai
+
+<span class="comment"># 2. 修改 base_url 和 api_key 即可</span>
+<span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI
+
+client = OpenAI(
+    api_key=<span class="string">"sk-你的令牌"</span>,
+    base_url=<span class="string">"https://api.你的域名.com/v1"</span>
+)
+
+response = client.chat.completions.create(
+    model=<span class="string">"gpt-4o"</span>,
+    messages=[{<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"你好！"</span>}]
+)
+
+<span class="keyword">print</span>(response.choices[<span class="string">0</span>].message.content)
+    </div>
+    <p style="text-align: center; margin-top: 24px;">
+        <a href="/register" class="btn btn-primary">获取你的 API Key</a>
+    </p>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+    <h2>准备好开始了吗？</h2>
+    <p>注册即送 $1 免费额度，无需信用卡</p>
+    <a href="/register" class="btn btn-primary" style="font-size: 16px; padding: 14px 36px;">免费注册</a>
+</section>
+
+<!-- Footer -->
+<footer>
+    <div class="footer-inner">
+        <div class="footer-brand">
+            <div class="logo">AI<span>Hub</span></div>
+            <p>一站式 AI API 中转服务平台，让每个开发者都能轻松接入全球顶级 AI 模型。</p>
+        </div>
+        <div class="footer-links">
+            <div class="footer-col">
+                <h4>产品</h4>
+                <a href="#features">功能介绍</a>
+                <a href="#pricing">定价方案</a>
+                <a href="#models">模型列表</a>
+            </div>
+            <div class="footer-col">
+                <h4>开发者</h4>
+                <a href="#docs">快速接入</a>
+                <a href="/docs">API 文档</a>
+                <a href="/status">服务状态</a>
+            </div>
+            <div class="footer-col">
+                <h4>支持</h4>
+                <a href="#contact">联系我们</a>
+                <a href="/faq">常见问题</a>
+                <a href="/terms">服务条款</a>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        &copy; 2026 AIHub. 本服务为 AI API 中转服务，不直接提供 AI 模型。
+    </div>
+</footer>
+
+</body>
+</html>

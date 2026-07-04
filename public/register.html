@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - AIHub</title>
+    <link rel="stylesheet" href="common.css">
+</head>
+<body>
+
+<div class="auth-wrap">
+    <div class="auth-card">
+        <div class="logo" style="margin-bottom: 24px;">AI<span>Hub</span></div>
+        <h1 class="auth-title">创建账户</h1>
+        <p class="auth-sub">注册即送 $1 免费额度</p>
+
+        <div id="error" class="form-error" style="display:none;"></div>
+        <div id="success" class="form-success" style="display:none;"></div>
+
+        <form id="regForm">
+            <div class="form-group">
+                <label class="form-label">用户名</label>
+                <input type="text" class="form-input" id="username" required placeholder="3-20 位字符">
+            </div>
+            <div class="form-group">
+                <label class="form-label">邮箱</label>
+                <input type="email" class="form-input" id="email" required placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" class="form-input" id="password" required placeholder="至少 6 位">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 8px;">注册</button>
+        </form>
+
+        <div class="auth-footer">
+            已有账户？<a href="login.html">去登录</a>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('regForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('error');
+    const sucEl = document.getElementById('success');
+    errEl.style.display = 'none';
+    sucEl.style.display = 'none';
+
+    try {
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error?.message || 'Registration failed');
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        sucEl.textContent = '注册成功！正在跳转到控制台...';
+        sucEl.style.display = 'block';
+
+        setTimeout(() => {
+            window.location.href = 'dashboard.html';
+        }, 1000);
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    }
+});
+</script>
+
+</body>
+</html>

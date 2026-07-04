@@ -1,0 +1,28 @@
+# AI API Gateway 部署包
+
+## 本包包含什么
+
+1. **New-API** — API 中转管理系统（Docker 部署）
+2. **Nginx** — 反向代理 + 静态站点服务
+3. **前端落地页** — 完整的营销页面（HTML）
+4. **一键部署脚本** — 自动安装和配置
+5. **SSL 配置脚本** — 自动申请 Let's Encrypt 证书
+6. **上游测试脚本** — 验证 QuickRouter 连通性
+
+## 最快上线方式
+
+```bash
+# 1. 上传到服务器后
+cd /opt/ai-api-gateway
+
+# 2. 一键部署
+sudo bash scripts/deploy.sh
+
+# 3. 配置 SSL
+sudo bash scripts/setup-ssl.sh
+
+# 4. 测试上游
+bash scripts/test-upstream.sh
+```
+
+详细说明见 README.md

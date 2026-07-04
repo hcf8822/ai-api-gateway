@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - AIHub</title>
+    <link rel="stylesheet" href="common.css">
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+    <div class="nav-inner">
+        <div class="logo" onclick="location.href='index.html'">AI<span>Hub</span> <span style="font-size:12px; background:var(--primary); color:#fff; padding:2px 8px; border-radius:4px; margin-left:8px;">Admin</span></div>
+        <div class="nav-right">
+            <button class="btn btn-outline btn-sm" onclick="location.href='dashboard.html'">用户视图</button>
+            <button class="btn btn-outline btn-sm" onclick="logout()">退出</button>
+        </div>
+    </div>
+</div>
+
+<div class="dash-wrap">
+    <div class="dash-sidebar">
+        <a class="dash-nav-item active" data-page="overview" onclick="showPage('overview')">
+            <span class="icon">[~]</span> 总览
+        </a>
+        <a class="dash-nav-item" data-page="users" onclick="showPage('users')">
+            <span class="icon">[U]</span> 用户管理
+        </a>
+        <a class="dash-nav-item" data-page="usage" onclick="showPage('usage')">
+            <span class="icon">[L]</span> 全部日志
+        </a>
+        <a class="dash-nav-item" data-page="config" onclick="showPage('config')">
+            <span class="icon">[C]</span> 系统配置
+        </a>
+    </div>
+
+    <div class="dash-main">
+        <!-- Overview -->
+        <div id="page-overview">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">系统总览</h1>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">总用户数</div>
+                    <div class="value" id="statUsers">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">总令牌数</div>
+                    <div class="value" id="statTokens">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">今日请求</div>
+                    <div class="value" id="statTodayReq">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">今日收入</div>
+                    <div class="value" id="statTodayRev">$0.00</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="label">累计收入</div>
+                    <div class="value" id="statTotalRev">$0.00</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">上游状态</div>
+                    <div class="value" id="statUpstream" style="font-size:16px;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users -->
+        <div id="page-users" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">用户管理</h1>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>邮箱</th>
+                            <th>角色</th>
+                            <th>余额</th>
+                            <th>已消费</th>
+                            <th>状态</th>
+                            <th>注册时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Usage logs -->
+        <div id="page-usage" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">全部请求日志</h1>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>用户</th>
+                            <th>模型</th>
+                            <th>输入</th>
+                            <th>输出</th>
+                            <th>费用</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allUsageBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Config -->
+        <div id="page-config" style="display:none;">
+            <h1 style="font-size: 24px; margin-bottom: 24px;">系统配置</h1>
+            <div class="card" style="max-width:600px;">
+                <h3 style="margin-bottom:16px;">上游 QuickRouter 配置</h3>
+                <div id="configStatus" style="margin-bottom:16px; font-size:13px;"></div>
+                <div class="form-group">
+                    <label class="form-label">QuickRouter API Key</label>
+                    <input type="text" class="form-input" id="upstreamKey" placeholder="sk-xxx (留空表示未配置)">
+                </div>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+                    配置后，所有 /v1/chat/completions 请求将转发到 QuickRouter。<br>
+                    未配置时，API 请求会返回 503 错误。
+                </p>
+                <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+            </div>
+
+            <div class="card" style="max-width:600px; margin-top:24px;">
+                <h3 style="margin-bottom:16px;">定价倍率</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">
+                    修改 server.js 中 CONFIG.modelMultipliers 来调整每个模型的定价倍率。<br>
+                    当前默认倍率: <strong>1.2</strong> (比上游贵 20%)
+                </p>
+                <table>
+                    <thead><tr><th>模型</th><th>倍率</th></tr></thead>
+                    <tbody>
+                        <tr><td>gpt-4o / gpt-4o-mini</td><td>1.2x</td></tr>
+                        <tr><td>Claude 系列</td><td>1.25x</td></tr>
+                        <tr><td>Gemini 系列</td><td>1.3x</td></tr>
+                        <tr><td>DeepSeek 系列</td><td>1.3x</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+
+if (!token) window.location.href = 'login.html';
+
+function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+}
+function showPage(page) {
+    document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
+    document.getElementById('page-' + page).style.display = 'block';
+    document.querySelectorAll('.dash-nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`[data-page="${page}"]`).classList.add('active');
+}
+
+async function loadStats() {
+    try {
+        const res = await fetch('/api/admin/stats', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('statUsers').textContent = data.data.userCount;
+            document.getElementById('statTokens').textContent = data.data.tokenCount;
+            document.getElementById('statTodayReq').textContent = data.data.todayRequests;
+            document.getElementById('statTodayRev').textContent = '$' + (data.data.todayUsage||0).toFixed(4);
+            document.getElementById('statTotalRev').textContent = '$' + (data.data.totalUsage||0).toFixed(4);
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function loadUsers() {
+    try {
+        const res = await fetch('/api/admin/users', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            const body = document.getElementById('usersBody');
+            body.innerHTML = data.data.map(u => `
+                <tr>
+                    <td><strong>${u.username}</strong></td>
+                    <td style="font-size:13px;">${u.email}</td>
+                    <td><span class="tag ${u.role==='admin'?'tag-amber':'tag-blue'}">${u.role}</span></td>
+                    <td>$${u.balance.toFixed(2)}</td>
+                    <td>$${(u.used_quota||0).toFixed(4)}</td>
+                    <td><span class="tag ${u.status==='active'?'tag-green':'tag-red'}">${u.status}</span></td>
+                    <td style="font-size:12px;">${u.created_at}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="addBalance('${u.id}')">充值</button>
+                        <button class="btn btn-danger btn-sm" onclick="toggleUser('${u.id}','${u.status}')">${u.status==='active'?'禁用':'启用'}</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function loadAllUsage() {
+    // This would need an admin endpoint; for now use the admin stats
+    document.getElementById('allUsageBody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:40px;">日志查看功能开发中</td></tr>';
+}
+
+async function loadHealth() {
+    try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        if (data.success) {
+            const el = document.getElementById('statUpstream');
+            if (data.upstream_configured) {
+                el.innerHTML = '<span class="tag tag-green">已配置</span>';
+                document.getElementById('configStatus').innerHTML = '<span class="tag tag-green">QuickRouter API Key 已配置</span>';
+            } else {
+                el.innerHTML = '<span class="tag tag-red">未配置</span>';
+                document.getElementById('configStatus').innerHTML = '<span class="tag tag-red">QuickRouter API Key 未配置 - API 请求将返回 503</span>';
+            }
+        }
+    } catch(e) { console.error(e); }
+}
+
+async function saveConfig() {
+    const key = document.getElementById('upstreamKey').value.trim();
+    if (!key) { alert('请输入 API Key'); return; }
+    // In production this would save to config file
+    // For now, show instructions
+    alert('请用以下方式配置上游 Key:\n\n在服务器上运行:\nset UPSTREAM_API_KEY=' + key + '\n\n然后重启服务:\nnpm start');
+}
+
+function addBalance(userId) {
+    const amount = prompt('充值金额 ($):', '10');
+    if (!amount) return;
+    fetch('/api/admin/users/' + userId, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ balance: parseFloat(amount) })
+    }).then(r => r.json()).then(() => loadUsers());
+}
+
+function toggleUser(userId, status) {
+    const newStatus = status === 'active' ? 'suspended' : 'active';
+    fetch('/api/admin/users/' + userId, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ status: newStatus })
+    }).then(r => r.json()).then(() => loadUsers());
+}
+
+// Init
+loadStats();
+loadUsers();
+loadAllUsage();
+loadHealth();
+</script>
+
+</body>
+</html>

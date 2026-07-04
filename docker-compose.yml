@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  new-api:
+    image: calciumion/new-api:latest
+    container_name: new-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - TZ=Asia/Shanghai
+      - SESSION_SECRET=${SESSION_SECRET}
+      - SQL_DSN=
+      - REDIS_CONN_STRING=
+      - ERROR_LOG_ENABLED=true
+      - STREAMING_TIMEOUT=120
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":true' | awk -F: '{print $$2}'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./html:/usr/share/nginx/html:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - new-api
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
