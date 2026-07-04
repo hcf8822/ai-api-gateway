@@ -50,22 +50,10 @@
         <div id="page-overview">
             <h1 style="font-size: 24px; margin-bottom: 24px;">概览</h1>
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="label">账户余额</div>
-                    <div class="value" id="statBalance">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">累计消费</div>
-                    <div class="value" id="statUsed">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">API 令牌</div>
-                    <div class="value" id="statTokens">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">今日请求</div>
-                    <div class="value" id="statToday">0</div>
-                </div>
+                <div class="stat-card"><div class="label">账户余额</div><div class="value" id="statBalance">$0.00</div></div>
+                <div class="stat-card"><div class="label">累计消费</div><div class="value" id="statUsed">$0.00</div></div>
+                <div class="stat-card"><div class="label">API 令牌</div><div class="value" id="statTokens">0</div></div>
+                <div class="stat-card"><div class="label">今日请求</div><div class="value" id="statToday">0</div></div>
             </div>
             <div class="card" style="margin-top: 24px;">
                 <div class="card-header">
@@ -84,17 +72,7 @@
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>名称</th>
-                            <th>Key</th>
-                            <th>额度限制</th>
-                            <th>已用</th>
-                            <th>状态</th>
-                            <th>创建时间</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>名称</th><th>Key</th><th>额度限制</th><th>已用</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
                     <tbody id="tokensBody"></tbody>
                 </table>
             </div>
@@ -105,16 +83,7 @@
             <h1 style="font-size: 24px; margin-bottom: 24px;">用量明细</h1>
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>模型</th>
-                            <th>输入 Token</th>
-                            <th>输出 Token</th>
-                            <th>费用</th>
-                            <th>状态</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>时间</th><th>模型</th><th>输入 Token</th><th>输出 Token</th><th>费用</th><th>状态</th></tr></thead>
                     <tbody id="usageBody"></tbody>
                 </table>
             </div>
@@ -125,27 +94,19 @@
             <h1 style="font-size: 24px; margin-bottom: 24px;">模型价格</h1>
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>模型</th>
-                            <th>提供商</th>
-                            <th>输入 ($/M)</th>
-                            <th>输出 ($/M)</th>
-                            <th>上下文</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>模型</th><th>提供商</th><th>输入 ($/M)</th><th>输出 ($/M)</th><th>上下文</th></tr></thead>
                     <tbody id="modelsBody"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Recharge (NEW FLOW) -->
+        <!-- Recharge (BNB + QR) -->
         <div id="page-recharge" style="display:none;">
             <h1 style="font-size: 24px; margin-bottom: 24px;">充值</h1>
 
-            <!-- Step 1: Select amount -->
+            <!-- Step 1: Amount + Method -->
             <div class="card" style="max-width: 600px; margin-bottom: 24px;">
-                <div class="card-title" style="margin-bottom: 16px;">第一步：选择充值金额</div>
+                <div class="card-title" style="margin-bottom: 16px;">第一步：选择充值金额和支付方式</div>
                 <div class="form-group">
                     <label class="form-label">充值金额 ($)</label>
                     <input type="number" class="form-input" id="rechargeAmount" value="5" min="1" step="0.5">
@@ -156,44 +117,80 @@
                     <button class="btn btn-outline btn-sm" onclick="setAmount(10)">$10</button>
                     <button class="btn btn-outline btn-sm" onclick="setAmount(50)">$50</button>
                 </div>
+                <!-- Payment method tabs -->
+                <div style="display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px;">
+                    <button class="btn btn-outline btn-sm" id="pmeth-bnb" onclick="selectPayMethod('bnb')" style="border-bottom: none; border-radius: 8px 8px 0 0; background: var(--primary); color: #fff; border-color: var(--primary);">💰 BNB 链付（推荐）</button>
+                    <button class="btn btn-outline btn-sm" id="pmeth-wechat" onclick="selectPayMethod('wechat')" style="border-bottom: none; border-radius: 8px 8px 0 0;">💬 微信</button>
+                    <button class="btn btn-outline btn-sm" id="pmeth-alipay" onclick="selectPayMethod('alipay')" style="border-bottom: none; border-radius: 8px 8px 0 0;">💛 支付宝</button>
+                </div>
             </div>
 
-            <!-- Step 2: Show QR codes -->
-            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
-                <div class="card-title" style="margin-bottom: 16px;">第二步：扫码付款</div>
+            <!-- BNB Chain Payment -->
+            <div class="card" id="bnbPayCard" style="max-width: 600px; margin-bottom: 24px; border: 2px solid var(--primary);">
+                <div class="card-title" style="margin-bottom: 16px;">💰 BNB Chain 支付</div>
+                <div id="bnbNotConfigured" style="display: none; padding: 20px; text-align: center; color: var(--text-muted); font-size: 14px;">
+                    管理员暂未配置 BNB Chain 收款地址，请选择其他支付方式。
+                </div>
+                <div id="bnbPayContent">
+                    <div style="background: var(--bg-soft); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">收款地址（BNB Chain / BEP20）：</p>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <code id="bnbDisplayAddr" style="display: block; font-size: 12px; background: white; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); word-break: break-all; line-height: 1.6;"></code>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="copyBnbAddr()">复制地址</button>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin-bottom: 16px;">
+                        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">扫码付款（钱包扫这个码）</p>
+                        <img id="bnbQrImg" style="width: 160px; height: 160px; border-radius: 8px; border: 1px solid var(--border); background: white; padding: 8px;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;" id="bnbPayNote">USDT(BEP20) 或 BNB 均可</p>
+                    </div>
+                    <div style="background: #FEF3C215; border: 1px solid #F59E0B30; border-radius: 8px; padding: 12px; font-size: 13px; color: #92400E; line-height: 1.8; margin-bottom: 16px;">
+                        <p>📌 付款步骤：</p>
+                        <p>1. 打开你的钱包（Trust Wallet / OKX / MetaMask）</p>
+                        <p>2. 选择 <strong>BNB Chain 网络</strong>，扫上方二维码 或 粘贴地址</p>
+                        <p>3. 发送 <strong>USDT（BEP20）或 BNB</strong> 到该地址</p>
+                        <p>4. 付款后在下方填写<strong>交易哈希（Tx Hash）</strong></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WeChat / Alipay QR codes -->
+            <div class="card" id="qrPayCard" style="max-width: 600px; margin-bottom: 24px; display: none;">
+                <div class="card-title" style="margin-bottom: 16px;">扫码付款</div>
                 <div id="qrCodes" style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px;">
                     <div id="wechatQrBox" style="text-align: center; display: none;">
                         <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">微信支付</p>
                         <img id="wechatQr" style="width: 180px; height: 180px; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: white; padding: 8px;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">微信扫码付款</p>
                     </div>
                     <div id="alipayQrBox" style="text-align: center; display: none;">
                         <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">支付宝</p>
                         <img id="alipayQr" style="width: 180px; height: 180px; border-radius: 8px; border: 1px solid var(--border); object-fit: contain; background: white; padding: 8px;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">支付宝扫码付款</p>
                     </div>
                     <div id="noQrMsg" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px;">
-                        正在加载收款码...
+                        请先选择支付方式
                     </div>
                 </div>
                 <div id="paymentContact" style="text-align: center; font-size: 13px; color: var(--text-muted); display: none; margin-bottom: 12px;"></div>
-                <div style="background: var(--bg-soft); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-muted); line-height: 1.8;">
-                    <p>📌 充值说明：</p>
-                    <p>1. 选择金额，扫码付款 <strong>相同金额</strong></p>
-                    <p>2. 付款后在下方填写备注（建议填用户名或邮箱）</p>
-                    <p>3. 提交后等待管理员审核，通常 5-30 分钟内到账</p>
-                </div>
             </div>
 
-            <!-- Step 3: Submit proof -->
-            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
-                <div class="card-title" style="margin-bottom: 16px;">第三步：提交充值申请</div>
+            <!-- Step 2: Submit -->
+            <div class="card" id="submitCard" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">第二步：提交充值申请</div>
                 <div class="form-group">
                     <label class="form-label">付款金额 ($)</label>
                     <input type="text" class="form-input" id="proofAmount" readonly style="background: var(--bg-soft);">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">付款备注 <span style="color: var(--text-muted); font-weight: normal;">（选填，如微信/支付宝账号、转账说明等）</span></label>
+                <!-- BNB: tx_hash input -->
+                <div class="form-group" id="txHashGroup" style="display: none;">
+                    <label class="form-label">交易哈希（Tx Hash）<span style="color: var(--text-muted); font-weight: normal;">（在钱包付款成功后复制）</span></label>
+                    <input type="text" class="form-input" id="txHashInput" placeholder="0x..." style="font-family: monospace; font-size: 13px;">
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">在钱包中找到这笔交易，点击「复制交易哈希」或「Copy TxID」粘贴到这里</p>
+                </div>
+                <!-- WeChat/Alipay: note input -->
+                <div class="form-group" id="noteGroup">
+                    <label class="form-label">付款备注 <span style="color: var(--text-muted); font-weight: normal;">（选填）</span></label>
                     <input type="text" class="form-input" id="proofNote" placeholder="例：微信支付，用户名 hcf8822">
                 </div>
                 <div id="rechargeMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
@@ -207,16 +204,7 @@
             <div id="ordersMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
             <div class="table-wrap">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>金额</th>
-                            <th>备注</th>
-                            <th>状态</th>
-                            <th>管理员备注</th>
-                            <th>申请时间</th>
-                            <th>处理时间</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>金额</th><th>方式</th><th>备注/Tx</th><th>状态</th><th>管理员备注</th><th>申请时间</th><th>处理时间</th></tr></thead>
                     <tbody id="ordersBody"></tbody>
                 </table>
             </div>
@@ -280,34 +268,50 @@ curl https://ai-api-gateway-dmyn.onrender.com/v1/chat/completions \
 <script>
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || 'null');
+let currentPayMethod = 'bnb';
 
-if (!token) {
-    window.location.href = 'login.html';
-}
+if (!token) window.location.href = 'login.html';
 
 function authHeaders() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
 }
-
 function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = 'login.html';
 }
-
 function showPage(page) {
     document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
     document.getElementById('page-' + page).style.display = 'block';
     document.querySelectorAll('.dash-nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`[data-page="${page}"]`).classList.add('active');
-    
     if (page === 'recharge') loadPaymentConfig();
     if (page === 'orders') loadOrders();
 }
-
 function setAmount(amount) {
     document.getElementById('rechargeAmount').value = amount;
     document.getElementById('proofAmount').value = '$' + amount;
+}
+
+// ============ Payment method switch ============
+function selectPayMethod(method) {
+    currentPayMethod = method;
+    ['bnb','wechat','alipay'].forEach(m => {
+        const el = document.getElementById('pmeth-' + m);
+        if (m === method) {
+            el.style.background = 'var(--primary)';
+            el.style.color = '#fff';
+            el.style.borderColor = 'var(--primary)';
+        } else {
+            el.style.background = '';
+            el.style.color = '';
+            el.style.borderColor = '';
+        }
+    });
+    document.getElementById('bnbPayCard').style.display = method === 'bnb' ? 'block' : 'none';
+    document.getElementById('qrPayCard').style.display = (method === 'wechat' || method === 'alipay') ? 'block' : 'none';
+    document.getElementById('txHashGroup').style.display = method === 'bnb' ? 'block' : 'none';
+    document.getElementById('noteGroup').style.display = method !== 'bnb' ? 'block' : 'none';
 }
 
 // ============ Load user info ============
@@ -419,8 +423,7 @@ async function createToken() {
     const quota = parseFloat(document.getElementById('tokenQuota').value) || 0;
     try {
         const res = await fetch('/api/tokens', {
-            method: 'POST',
-            headers: authHeaders(),
+            method: 'POST', headers: authHeaders(),
             body: JSON.stringify({ name, quota_limit: quota })
         });
         const data = await res.json();
@@ -449,57 +452,92 @@ async function loadPaymentConfig() {
         const res = await fetch('/api/payment/config');
         const data = await res.json();
         if (data.success) {
-            const wechatBox = document.getElementById('wechatQrBox');
-            const alipayBox = document.getElementById('alipayQrBox');
-            const noQrMsg = document.getElementById('noQrMsg');
-            const contactEl = document.getElementById('paymentContact');
-            
+            const bnbAddr = data.data.bnb_address || '';
+            const bnbNote = data.data.bnb_usdt_note || '';
+
+            // BNB Chain
+            if (bnbAddr) {
+                document.getElementById('bnbDisplayAddr').textContent = bnbAddr;
+                document.getElementById('bnbQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=' + encodeURIComponent(bnbAddr);
+                document.getElementById('bnbPayContent').style.display = 'block';
+                document.getElementById('bnbNotConfigured').style.display = 'none';
+            } else {
+                document.getElementById('bnbPayContent').style.display = 'none';
+                document.getElementById('bnbNotConfigured').style.display = 'block';
+            }
+            if (bnbNote) {
+                document.getElementById('bnbPayNote').textContent = bnbNote;
+            }
+
+            // WeChat / Alipay
             let hasQr = false;
             if (data.data.wechat_qr) {
                 document.getElementById('wechatQr').src = data.data.wechat_qr;
-                wechatBox.style.display = 'block';
+                document.getElementById('wechatQrBox').style.display = 'block';
                 hasQr = true;
             }
             if (data.data.alipay_qr) {
                 document.getElementById('alipayQr').src = data.data.alipay_qr;
-                alipayBox.style.display = 'block';
+                document.getElementById('alipayQrBox').style.display = 'block';
                 hasQr = true;
             }
             if (data.data.contact) {
-                contactEl.style.display = 'block';
-                contactEl.innerHTML = '如有问题请联系管理员：' + data.data.contact;
+                document.getElementById('paymentContact').style.display = 'block';
+                document.getElementById('paymentContact').innerHTML = '如有问题请联系管理员：' + data.data.contact;
             }
-            if (!hasQr) {
-                noQrMsg.textContent = '收款码暂未配置，请联系管理员。';
-                noQrMsg.style.display = 'block';
-            } else {
-                noQrMsg.style.display = 'none';
+
+            // Auto-select best method
+            if (bnbAddr) {
+                selectPayMethod('bnb');
+            } else if (data.data.wechat_qr) {
+                selectPayMethod('wechat');
+            } else if (data.data.alipay_qr) {
+                selectPayMethod('alipay');
             }
         }
     } catch(e) { console.error(e); }
 }
 
-function submitRechargeOrder() {
+function copyBnbAddr() {
+    const addr = document.getElementById('bnbDisplayAddr').textContent;
+    if (!addr) return;
+    navigator.clipboard.writeText(addr);
+    alert('✅ 地址已复制！');
+}
+
+async function submitRechargeOrder() {
     const amount = parseFloat(document.getElementById('rechargeAmount').value);
-    const note = document.getElementById('proofNote').value || '';
     if (!amount || amount <= 0) return alert('请输入有效金额');
-    
+
     const msgEl = document.getElementById('rechargeMsg');
     msgEl.style.display = 'none';
-    
-    fetch('/api/recharge/order', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ amount, note })
-    })
-    .then(r => r.json())
-    .then(data => {
+
+    let body = { amount, payment_method: currentPayMethod };
+
+    if (currentPayMethod === 'bnb') {
+        const txHash = document.getElementById('txHashInput').value.trim();
+        if (!txHash || !txHash.startsWith('0x')) return alert('请输入有效的交易哈希（以 0x 开头）');
+        body.tx_hash = txHash;
+    } else {
+        body.note = document.getElementById('proofNote').value || '';
+    }
+
+    try {
+        const res = await fetch('/api/recharge/order', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
         msgEl.style.display = 'block';
         if (data.success) {
             msgEl.style.background = '#065F4615';
             msgEl.style.color = '#059669';
             msgEl.style.border = '1px solid #059669';
-            msgEl.innerHTML = `<strong>✅ 充值申请已提交！</strong><br>金额：$${amount}<br>请等待管理员审核，通常 5-30 分钟内到账。<br>你可以在「充值记录」页面查看进度。`;
+            msgEl.innerHTML = `<strong>✅ 充值申请已提交！</strong><br>金额：$${amount}<br>` +
+                (currentPayMethod === 'bnb'
+                    ? `交易哈希已记录，管理员将链上验证后到账。<br>`
+                    : `请等待管理员审核，通常 5-30 分钟内到账。<br>`) +
+                `你可以在「充值记录」页面查看进度。`;
             document.getElementById('submitOrderBtn').disabled = true;
             document.getElementById('submitOrderBtn').textContent = '已提交，等待审核...';
             setTimeout(() => { showPage('orders'); }, 2000);
@@ -509,14 +547,13 @@ function submitRechargeOrder() {
             msgEl.style.border = '1px solid #EF4444';
             msgEl.textContent = data.error?.message || '提交失败';
         }
-    })
-    .catch(e => {
+    } catch(e) {
         msgEl.style.display = 'block';
         msgEl.style.background = '#EF444415';
         msgEl.style.color = '#EF4444';
         msgEl.style.border = '1px solid #EF4444';
         msgEl.textContent = '提交失败，请重试';
-    });
+    }
 }
 
 // ============ Orders ============
@@ -532,22 +569,27 @@ async function loadOrders() {
                 msgEl.style.background = '#F59E0B15';
                 msgEl.style.color = '#D97706';
                 msgEl.style.border = '1px solid #D97706';
-                msgEl.innerHTML = `你有 <strong>${pending}</strong> 笔充值申请待审核，到账后我们会通过邮件或站内通知你。`;
+                msgEl.innerHTML = `你有 <strong>${pending}</strong> 笔充值申请待审核。`;
             }
             const body = document.getElementById('ordersBody');
             if (data.data.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:40px;">暂无充值记录</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:40px;">暂无充值记录</td></tr>';
                 return;
             }
+            const methodMap = { bnb: '💰 BNB', wechat: '微信', alipay: '支付宝', manual: '手动' };
             body.innerHTML = data.data.map(o => {
                 const statusMap = { pending: '待审核', approved: '已到账', rejected: '已拒绝' };
                 const statusColor = { pending: 'tag-yellow', approved: 'tag-green', rejected: 'tag-red' };
+                const noteDisplay = o.tx_hash
+                  ? `<a href="https://bscscan.com/tx/${o.tx_hash}" target="_blank" style="font-size:11px; color:var(--primary);">${o.tx_hash.slice(0,10)}...</a>`
+                  : (o.note || '-');
                 return `
                 <tr>
                     <td style="font-weight:600;">$${(o.amount||0).toFixed(2)}</td>
-                    <td style="font-size:13px;">${o.note || '-'}</td>
+                    <td><span class="tag tag-blue">${methodMap[o.payment_method]||'-'}</span></td>
+                    <td style="font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${noteDisplay}</td>
                     <td><span class="tag ${statusColor[o.status]||'tag-yellow'}">${statusMap[o.status]||o.status}</span></td>
-                    <td style="font-size:13px; color:var(--text-muted);">${o.admin_note || '-'}</td>
+                    <td style="font-size:13px;">${o.admin_note || '-'}</td>
                     <td style="font-size:12px; color:var(--text-muted);">${o.created_at}</td>
                     <td style="font-size:12px; color:var(--text-muted);">${o.updated_at !== o.created_at ? o.updated_at : '-'}</td>
                 </tr>
@@ -557,13 +599,12 @@ async function loadOrders() {
     } catch(e) { console.error(e); }
 }
 
-// Watch amount change to sync proof amount
-const amountInput = document.getElementById('rechargeAmount');
-amountInput.addEventListener('input', function() {
+// Watch amount change
+document.getElementById('rechargeAmount').addEventListener('input', function() {
     document.getElementById('proofAmount').value = '$' + (parseFloat(this.value) || 0);
 });
 
-// Init
+// ============ Init ============
 loadUser();
 loadTokens();
 loadUsage();

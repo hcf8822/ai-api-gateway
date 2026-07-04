@@ -97,7 +97,8 @@
                         <tr>
                             <th>用户</th>
                             <th>金额</th>
-                            <th>备注</th>
+                            <th>方式</th>
+                            <th>备注/交易哈希</th>
                             <th>状态</th>
                             <th>申请时间</th>
                             <th>操作</th>
@@ -111,10 +112,34 @@
         <!-- Payment Config (NEW) -->
         <div id="page-payment" style="display:none;">
             <h1 style="font-size: 24px; margin-bottom: 24px;">收款配置</h1>
+
+            <!-- BNB Chain 配置 -->
             <div class="card" style="max-width: 600px; margin-bottom: 24px;">
-                <div class="card-title" style="margin-bottom: 16px;">收款二维码</div>
+                <div class="card-title" style="margin-bottom: 16px;">💰 BNB Chain 收款（推荐）</div>
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-                    填写你的微信/支付宝收款二维码图片链接。建议先将二维码截图上传到图床（如 <a href="https://imgur.com" target="_blank">imgur.com</a>），然后把图片链接粘贴到这里。
+                    填入你的 BNB Chain（BEP20）收款地址，用户可直接用钱包扫码付款。<br>
+                    支持 BNB、USDT、USDC 等所有 BEP20 代币。<br>
+                    <strong>获取地址：</strong>在 Trust Wallet / OKX 钱包 / MetaMask 中复制「接收」地址（以 0x 开头）。
+                </p>
+                <div class="form-group">
+                    <label class="form-label">BNB Chain 收款地址（0x 开头）</label>
+                    <input type="text" class="form-input" id="bnbAddress" placeholder="0x..." style="font-family: monospace; font-size: 13px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">付款说明（会显示在用户充值页）</label>
+                    <input type="text" class="form-input" id="bnbNote" placeholder="USDT(BEP20) 或 BNB 均可，付款后提交交易哈希">
+                </div>
+                <div id="bnbQrPreview" style="margin-top: 12px; display: none;">
+                    <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">地址二维码（用户扫码付款）</p>
+                    <img id="bnbQrImg" style="width: 150px; height: 150px; border-radius: 8px; border: 1px solid var(--border); background: white; padding: 6px;">
+                </div>
+            </div>
+
+            <!-- 微信/支付宝 配置 -->
+            <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+                <div class="card-title" style="margin-bottom: 16px;">微信 / 支付宝收款码</div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                    填写你的微信/支付宝收款二维码图片链接。建议先将二维码截图上传到图床，然后把图片链接粘贴到这里。
                 </p>
                 <div class="form-group">
                     <label class="form-label">微信收款码图片链接</label>
@@ -128,11 +153,13 @@
                     <label class="form-label">联系信息（选填，会显示在用户充值页面）</label>
                     <input type="text" class="form-input" id="contactInfo" placeholder="如：充值问题请联系微信 xxx">
                 </div>
-                <div id="paymentMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
-                <button class="btn btn-primary" onclick="savePaymentConfig()">保存配置</button>
             </div>
-            <!-- Preview -->
-            <div class="card" style="max-width: 600px;">
+
+            <div id="paymentMsg" style="display:none; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;"></div>
+            <button class="btn btn-primary" onclick="savePaymentConfig()">保存配置</button>
+
+            <!-- 预览 -->
+            <div class="card" style="max-width: 600px; margin-top: 24px;">
                 <div class="card-title" style="margin-bottom: 16px;">预览</div>
                 <div style="display: flex; gap: 24px; flex-wrap: wrap;">
                     <div id="wechatPreview" style="text-align: center; display: none;">
@@ -143,7 +170,7 @@
                         <p style="font-size: 13px; margin-bottom: 8px; color: var(--text-muted);">支付宝收款码</p>
                         <img id="alipayPreviewImg" style="width: 150px; height: 150px; border-radius: 8px; border: 1px solid var(--border); background: white; padding: 6px; object-fit: contain;">
                     </div>
-                    <div id="noPaymentPreview" style="color: var(--text-muted); font-size: 14px;">暂未配置收款码</div>
+                    <div id="noPaymentPreview" style="color: var(--text-muted); font-size: 14px;">暂未配置收款方式</div>
                 </div>
             </div>
         </div>
@@ -306,18 +333,24 @@ async function loadOrders(status) {
             body.innerHTML = data.data.map(o => {
                 const statusMap = { pending: '待审核', approved: '已到账', rejected: '已拒绝' };
                 const statusColor = { pending: 'tag-yellow', approved: 'tag-green', rejected: 'tag-red' };
+                const methodMap = { bnb: '💰 BNB链', wechat: '微信', alipay: '支付宝', manual: '手动' };
+                const noteDisplay = o.tx_hash
+                  ? `<div style="font-size:11px; color:var(--text-muted); word-break:break-all;">TX: ${o.tx_hash.slice(0,10)}... <a href="https://bscscan.com/tx/${o.tx_hash}" target="_blank" style="color:var(--primary);">查看↗</a></div>`
+                  : (o.note || '-');
                 const actions = o.status === 'pending' ? `
                     <button class="btn btn-primary btn-sm" onclick="approveOrder('${o.id}', ${o.amount}, '${o.username}')">确认到账</button>
+                    ${o.tx_hash ? `<button class="btn btn-outline btn-sm" onclick="verifyBscTx('${o.tx_hash}')" style="margin-left:4px;">BSC验证</button>` : ''}
                     <button class="btn btn-danger btn-sm" onclick="rejectOrder('${o.id}')">拒绝</button>
                 ` : `<span style="font-size:12px; color:var(--text-muted);">${o.admin_note || '-'}</span>`;
                 return `
                     <tr>
                         <td><strong>${o.username}</strong></td>
                         <td style="font-weight:600; font-size:15px;">$${(o.amount||0).toFixed(2)}</td>
-                        <td style="font-size:13px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${o.note || ''}">${o.note || '-'}</td>
+                        <td><span class="tag tag-blue">${methodMap[o.payment_method]||o.payment_method||'--'}</span></td>
+                        <td style="font-size:13px; max-width:220px; overflow:hidden; text-overflow:ellipsis;" title="${o.note || ''} ${o.tx_hash||''}">${noteDisplay}</td>
                         <td><span class="tag ${statusColor[o.status]||'tag-yellow'}">${statusMap[o.status]||o.status}</span></td>
                         <td style="font-size:12px; color:var(--text-muted);">${o.created_at}</td>
-                        <td style="display:flex; gap:6px;">${actions}</td>
+                        <td style="display:flex; gap:6px; flex-wrap:wrap;">${actions}</td>
                     </tr>
                 `;
             }).join('');
@@ -358,22 +391,16 @@ async function rejectOrder(id) {
 // =========== Payment Config ===========
 async function loadPaymentConfig() {
     try {
-        const res = await fetch('/api/payment/config');
+        const res = await fetch('/api/admin/payment/config', { headers: authHeaders() });
         const data = await res.json();
         if (data.success) {
             document.getElementById('wechatQrUrl').value = data.data.wechat_qr || '';
             document.getElementById('alipayQrUrl').value = data.data.alipay_qr || '';
             document.getElementById('contactInfo').value = data.data.contact || '';
+            document.getElementById('bnbAddress').value = data.data.bnb_address || '';
+            document.getElementById('bnbNote').value = data.data.bnb_usdt_note || '';
             updatePaymentPreview();
-        }
-        // Also load current config from admin endpoint
-        const res2 = await fetch('/api/admin/payment/config', { headers: authHeaders() });
-        const data2 = await res2.json();
-        if (data2.success) {
-            document.getElementById('wechatQrUrl').value = data2.data.wechat_qr || '';
-            document.getElementById('alipayQrUrl').value = data2.data.alipay_qr || '';
-            document.getElementById('contactInfo').value = data2.data.contact || '';
-            updatePaymentPreview();
+            updateBnbQrPreview();
         }
     } catch(e) { console.error(e); }
 }
@@ -397,10 +424,21 @@ function updatePaymentPreview() {
     } else {
         alipayBox.style.display = 'none';
     }
-    if (!wechatUrl && !alipayUrl) {
+    if (!wechatUrl && !alipayUrl && !document.getElementById('bnbAddress').value.trim()) {
         noPrev.style.display = 'block';
     } else {
         noPrev.style.display = 'none';
+    }
+}
+
+function updateBnbQrPreview() {
+    const addr = document.getElementById('bnbAddress').value.trim();
+    const preview = document.getElementById('bnbQrPreview');
+    if (addr && addr.startsWith('0x')) {
+        document.getElementById('bnbQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(addr);
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
     }
 }
 
@@ -408,13 +446,15 @@ async function savePaymentConfig() {
     const wechatQr = document.getElementById('wechatQrUrl').value.trim();
     const alipayQr = document.getElementById('alipayQrUrl').value.trim();
     const contact = document.getElementById('contactInfo').value.trim();
+    const bnb_address = document.getElementById('bnbAddress').value.trim();
+    const bnb_usdt_note = document.getElementById('bnbNote').value.trim();
     const msgEl = document.getElementById('paymentMsg');
     msgEl.style.display = 'none';
 
     try {
         const res = await fetch('/api/admin/payment/config', {
             method: 'POST', headers: authHeaders(),
-            body: JSON.stringify({ wechat_qr: wechatQr, alipay_qr: alipayQr, contact })
+            body: JSON.stringify({ wechat_qr: wechatQr, alipay_qr: alipayQr, contact, bnb_address, bnb_usdt_note })
         });
         const data = await res.json();
         if (data.success) {
@@ -422,8 +462,9 @@ async function savePaymentConfig() {
             msgEl.style.background = '#065F4615';
             msgEl.style.color = '#059669';
             msgEl.style.border = '1px solid #059669';
-            msgEl.textContent = '✅ 收款配置已保存！用户现在可以在充值页面看到收款码了。';
+            msgEl.innerHTML = '✅ 收款配置已保存！<br>BNB Chain 地址：' + (bnb_address || '未配置') + '<br>用户现在可以在充值页面看到加密货币支付选项了。';
             updatePaymentPreview();
+            updateBnbQrPreview();
         }
     } catch(e) {
         msgEl.style.display = 'block';
@@ -434,10 +475,38 @@ async function savePaymentConfig() {
     }
 }
 
+// BSC verification
+async function verifyBscTx(txHash) {
+    if (!txHash) return;
+    const msg = prompt('正在查询 BscScan...\n\n交易哈希：' + txHash + '\n\n如需验证代币转账（USDT），请输入代币合约地址（留空仅验证 BNB 转账）：\n\nUSDT(BEP20) 合约：0x55d3983263a0aa5e92bafb9e0caceb21d886618b3\n（直接回车跳过，仅验证 BNB 转账）');
+    const hasToken = msg !== null && msg.trim() !== '';
+    let url = '/api/payment/verify-bnb-tx?tx_hash=' + encodeURIComponent(txHash);
+    if (hasToken) {
+        url = '/api/payment/verify-bnb-token?tx_hash=' + encodeURIComponent(txHash) + '&token_contract=' + encodeURIComponent(msg.trim());
+    }
+    try {
+        const res = await fetch(url, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.success) {
+            if (hasToken) {
+                const t = data.data.transfers[0];
+                alert('✅ 链上验证成功！\n\nfrom: ' + (t?.from||'--') + '\nTo: ' + (t?.to||'--') + '\n金额: ' + (t?.value||'--') + ' ' + (t?.token_symbol||'USDT') + '\n匹配地址: ' + (t?.matches_address ? '✅ 是' : '❌ 否'));
+            } else {
+                alert('✅ 链上验证成功！\n\nFrom: ' + data.data.from + '\nTo: ' + data.data.to + '\nValue: ' + data.data.value_bnb + ' BNB' + '\n匹配地址: ' + (data.data.matches_address ? '✅ 是' : '❌ 否（实际收款地址：' + data.data.to + '）'));
+            }
+        } else {
+            alert('❌ 验证失败：' + (data.message || '请检查交易哈希是否正确'));
+        }
+    } catch(e) {
+        alert('查询失败：' + e.message);
+    }
+}
+
 // Watch URL inputs for live preview
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('wechatQrUrl').addEventListener('input', updatePaymentPreview);
     document.getElementById('alipayQrUrl').addEventListener('input', updatePaymentPreview);
+    document.getElementById('bnbAddress').addEventListener('input', updateBnbQrPreview);
 });
 
 // =========== Users ===========

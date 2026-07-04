@@ -61,9 +61,12 @@ function writeJSON(file, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Payment config (QR code URLs)
+// Payment config (QR code URLs + crypto)
 function getPaymentConfig() {
-  return readJSON('payment_config.json', { wechat_qr: '', alipay_qr: '', contact: '' });
+  return readJSON('payment_config.json', {
+    wechat_qr: '', alipay_qr: '', contact: '',
+    bnb_address: '', bnb_usdt_note: 'USDT(BEP20) 或 BNB 均可，付款后提交交易哈希'
+  });
 }
 function setPaymentConfig(cfg) {
   writeJSON('payment_config.json', cfg);
@@ -328,52 +331,141 @@ app.get('/api/models', (req, res) => {
 // ============ PAYMENT CONFIG (Public) ============
 app.get('/api/payment/config', (req, res) => {
   const cfg = getPaymentConfig();
-  // Only return public info (QR URLs and contact)
   res.json({
     success: true,
     data: {
       wechat_qr: cfg.wechat_qr || '',
       alipay_qr: cfg.alipay_qr || '',
       contact: cfg.contact || '',
+      bnb_address: cfg.bnb_address || '',
+      bnb_usdt_note: cfg.bnb_usdt_note || '',
     }
   });
 });
 
 // ============ PAYMENT CONFIG (Admin) ============
 app.post('/api/admin/payment/config', adminMiddleware, (req, res) => {
-  const { wechat_qr, alipay_qr, contact } = req.body;
+  const { wechat_qr, alipay_qr, contact, bnb_address, bnb_usdt_note } = req.body;
   const cfg = getPaymentConfig();
   if (wechat_qr !== undefined) cfg.wechat_qr = wechat_qr;
   if (alipay_qr !== undefined) cfg.alipay_qr = alipay_qr;
   if (contact !== undefined) cfg.contact = contact;
+  if (bnb_address !== undefined) cfg.bnb_address = bnb_address;
+  if (bnb_usdt_note !== undefined) cfg.bnb_usdt_note = bnb_usdt_note;
   setPaymentConfig(cfg);
   res.json({ success: true, data: cfg });
 });
 
 // ============ RECHARGE FLOW ============
 
-// Step 1: User creates a recharge order (after scanning QR code and paying)
+// Step 1: User creates a recharge order (after paying)
 app.post('/api/recharge/order', authMiddleware, (req, res) => {
-  const { amount, note } = req.body;
+  const { amount, note, payment_method, tx_hash } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: { message: 'Invalid amount' } });
-  
+
   const order = {
     id: uuidv4(),
     user_id: req.user.id,
     username: req.user.username,
     amount: parseFloat(amount),
     note: note || '',
+    payment_method: payment_method || 'manual', // wechat, alipay, bnb
+    tx_hash: tx_hash || '',
     status: 'pending',  // pending -> approved -> rejected
     admin_note: '',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  
+
   addRechargeOrder(order);
   res.json({ success: true, data: order });
 });
 
-// Step 2: User views their recharge orders
+// Step 2: Verify BNB transaction on-chain (BscScan free API)
+app.get('/api/payment/verify-bnb-tx', adminMiddleware, async (req, res) => {
+  const { tx_hash, expected_amount, expected_address } = req.query;
+  if (!tx_hash) return res.status(400).json({ error: { message: 'tx_hash required' } });
+
+  const https = require('https');
+  const url = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionByHash&txhash=${tx_hash}`;
+
+  https.get(url, (r) => {
+    let body = '';
+    r.on('data', c => body += c);
+    r.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        if (data.error || !data.result || data.result === null) {
+          return res.json({ success: false, message: 'Transaction not found on BSC' });
+        }
+        const tx = data.result;
+        const to_address = '0x' + tx.to.toLowerCase().slice(-40);
+        const value_bnb = parseInt(tx.value, 16) / 1e18;
+        const cfg = getPaymentConfig();
+        const cfg_address = (cfg.bnb_address || '').toLowerCase();
+
+        res.json({
+          success: true,
+          data: {
+            tx_hash,
+            from: '0x' + tx.from.toLowerCase().slice(-40),
+            to: to_address,
+            value_bnb: value_bnb.toFixed(6),
+            value_wei: tx.value,
+            block_number: parseInt(tx.blockNumber, 16),
+            matches_address: cfg_address ? to_address === cfg_address : null,
+            expected_address: cfg_address || null,
+          }
+        });
+      } catch (e) {
+        res.json({ success: false, message: 'Failed to parse BscScan response' });
+      }
+    });
+  }).on('error', (e) => {
+    res.json({ success: false, message: 'BscScan request failed: ' + e.message });
+  });
+});
+
+// Step 2.5: Verify BEP20 token transfer (USDT/USDC) on BSC
+app.get('/api/payment/verify-bnb-token', adminMiddleware, async (req, res) => {
+  const { tx_hash, token_contract } = req.query;
+  // Default to USDT on BNB Chain: 0x55d3983263a0aa5e92bafb9e0caceb21d886618b3
+  const contract = token_contract || '0x55d3983263a0aa5e92bafb9e0caceb21d886618b3';
+
+  if (!tx_hash) return res.status(400).json({ error: { message: 'tx_hash required' } });
+
+  const https = require('https');
+  const url = `https://api.bscscan.com/api?module=account&action=tokentx&contractaddress=${contract}&txhash=${tx_hash}&page=1&offset=10`;
+
+  https.get(url, (r) => {
+    let body = '';
+    r.on('data', c => body += c);
+    r.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        if (data.status !== '1' || !data.result || data.result.length === 0) {
+          return res.json({ success: false, message: 'No token transfer found for this tx', raw: data });
+        }
+        const cfg = getPaymentConfig();
+        const cfg_address = (cfg.bnb_address || '').toLowerCase();
+        const transfers = data.result.map(t => ({
+          from: t.from.toLowerCase(),
+          to: t.to.toLowerCase(),
+          value: (parseInt(t.value) / 1e18).toFixed(6),
+          token_symbol: t.tokenSymbol,
+          matches_address: cfg_address ? t.to.toLowerCase() === cfg_address : null,
+        }));
+        res.json({ success: true, data: { tx_hash, transfers, expected_address: cfg_address || null } });
+      } catch (e) {
+        res.json({ success: false, message: 'Failed to parse response', raw: body.substring(0, 500) });
+      }
+    });
+  }).on('error', (e) => {
+    res.json({ success: false, message: 'BscScan request failed: ' + e.message });
+  });
+});
+
+// Step 3: User views their recharge orders
 app.get('/api/recharge/orders', authMiddleware, (req, res) => {
   const orders = getRechargeOrders().filter(o => o.user_id === req.user.id).reverse();
   res.json({ success: true, data: orders });
