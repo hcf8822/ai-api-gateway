@@ -1,13 +1,11 @@
 require('dotenv').config();
 const express = require('express');
-const Database = require('better-sqlite3');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,34 +13,19 @@ const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('he
 
 // ============ Config ============
 const CONFIG = {
-  // QuickRouter upstream
   upstream: {
     baseUrl: 'https://api.quickrouter.ai',
     apiKey: process.env.UPSTREAM_API_KEY || '',
   },
-  // Pricing multipliers (your price = upstream price * multiplier)
-  // Set higher than 1.0 to make profit
   defaultMultiplier: 1.2,
   modelMultipliers: {
-    'gpt-4o': 1.2,
-    'gpt-4o-mini': 1.2,
-    'gpt-4-turbo': 1.2,
-    'gpt-3.5-turbo': 1.2,
-    'claude-sonnet-4-20250514': 1.25,
-    'claude-3-5-sonnet-20241022': 1.25,
-    'claude-3-opus-20240229': 1.25,
-    'claude-3-haiku-20240307': 1.25,
-    'gemini-2.0-flash': 1.3,
-    'gemini-1.5-pro': 1.3,
-    'gemini-1.5-flash': 1.3,
-    'deepseek-chat': 1.3,
-    'deepseek-coder': 1.3,
-    'grok-2': 1.2,
-    'grok-beta': 1.2,
+    'gpt-4o': 1.2, 'gpt-4o-mini': 1.2, 'gpt-4-turbo': 1.2, 'gpt-3.5-turbo': 1.2,
+    'claude-sonnet-4-20250514': 1.25, 'claude-3-5-sonnet-20241022': 1.25,
+    'claude-3-opus-20240229': 1.25, 'claude-3-haiku-20240307': 1.25,
+    'gemini-2.0-flash': 1.3, 'gemini-1.5-pro': 1.3, 'gemini-1.5-flash': 1.3,
+    'deepseek-chat': 1.3, 'deepseek-coder': 1.3, 'grok-2': 1.2, 'grok-beta': 1.2,
   },
-  // Free credits for new users (in USD)
   signupBonus: 1.0,
-  // Supported models
   models: [
     { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', input: 2.5, output: 10, context: '128K', tags: ['recommended'] },
     { id: 'gpt-4o-mini', name: 'GPT-4o mini', provider: 'OpenAI', input: 0.15, output: 0.6, context: '128K', tags: ['cheap'] },
@@ -61,66 +44,129 @@ const CONFIG = {
   ],
 };
 
-// ============ Database ============
-const db = new Database(path.join(__dirname, 'data', 'gateway.db'));
-db.pragma('journal_mode = WAL');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT DEFAULT 'user',
-    balance REAL DEFAULT 0,
-    used_quota REAL DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    status TEXT DEFAULT 'active'
-  );
-
-  CREATE TABLE IF NOT EXISTS tokens (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    name TEXT DEFAULT 'default',
-    key TEXT UNIQUE NOT NULL,
-    quota_limit REAL DEFAULT 0,
-    used_quota REAL DEFAULT 0,
-    status TEXT DEFAULT 'active',
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS usage_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,
-    token_id TEXT,
-    model TEXT NOT NULL,
-    input_tokens INTEGER DEFAULT 0,
-    output_tokens INTEGER DEFAULT 0,
-    cost REAL DEFAULT 0,
-    status TEXT DEFAULT 'success',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS recharge_orders (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    amount REAL NOT NULL,
-    method TEXT DEFAULT 'manual',
-    status TEXT DEFAULT 'pending',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// Ensure data dir exists
+// ============ Pure JS JSON Database ============
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
+function readJSON(file, defaultVal = []) {
+  const filePath = path.join(dataDir, file);
+  try {
+    if (!fs.existsSync(filePath)) return defaultVal;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (e) { return defaultVal; }
+}
+
+function writeJSON(file, data) {
+  const filePath = path.join(dataDir, file);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// Initialize admin if not exists
+function initAdmin() {
+  const users = readJSON('users.json');
+  if (!users.find(u => u.role === 'admin')) {
+    users.push({
+      id: uuidv4(), username: 'admin', email: 'admin@localhost',
+      password: bcrypt.hashSync('admin123', 10), role: 'admin',
+      balance: 1000, used_quota: 0, status: 'active',
+      created_at: new Date().toISOString(),
+    });
+    writeJSON('users.json', users);
+    console.log('\n================================================');
+    console.log('  Admin account created:');
+    console.log('  Username: admin');
+    console.log('  Password: admin123');
+    console.log('  Balance:  $1000 (for testing)');
+    console.log('============================================\n');
+  }
+}
+
+// DB helper functions
+function findUser(by, val) {
+  const users = readJSON('users.json');
+  return users.find(u => u[by] === val && u.status === 'active');
+}
+function getUserById(id) {
+  const users = readJSON('users.json');
+  return users.find(u => u.id === id);
+}
+function updateUser(id, updates) {
+  const users = readJSON('users.json');
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return;
+  users[idx] = { ...users[idx], ...updates };
+  writeJSON('users.json', users);
+}
+function getAllUsers() { return readJSON('users.json'); }
+
+function findToken(key) {
+  const tokens = readJSON('tokens.json');
+  return tokens.find(t => t.key === key && t.status === 'active');
+}
+function getUserTokens(userId) {
+  const tokens = readJSON('tokens.json');
+  return tokens.filter(t => t.user_id === userId);
+}
+function addToken(userId, name, quota_limit) {
+  const tokens = readJSON('tokens.json');
+  const token = {
+    id: uuidv4(), user_id: userId, name: name || 'default',
+    key: 'sk-' + crypto.randomBytes(24).toString('hex'),
+    quota_limit: quota_limit || 0, used_quota: 0, status: 'active',
+    created_at: new Date().toISOString(),
+  };
+  tokens.push(token);
+  writeJSON('tokens.json', tokens);
+  return token;
+}
+function deleteToken(id, userId) {
+  let tokens = readJSON('tokens.json');
+  tokens = tokens.filter(t => !(t.id === id && t.user_id === userId));
+  writeJSON('tokens.json', tokens);
+}
+function updateToken(id, userId, updates) {
+  const tokens = readJSON('tokens.json');
+  const idx = tokens.findIndex(t => t.id === id && t.user_id === userId);
+  if (idx === -1) return;
+  tokens[idx] = { ...tokens[idx], ...updates };
+  writeJSON('tokens.json', tokens);
+}
+
+function addUsageLog(userId, tokenId, model, inputTokens, outputTokens, cost) {
+  const logs = readJSON('usage_logs.json');
+  logs.push({
+    id: logs.length + 1, user_id: userId, token_id: tokenId, model,
+    input_tokens: inputTokens, output_tokens: outputTokens,
+    cost, status: 'success', created_at: new Date().toISOString(),
+  });
+  // Keep only last 10000 logs to avoid file getting too large
+  if (logs.length > 10000) logs.splice(0, logs.length - 10000);
+  writeJSON('usage_logs.json', logs);
+}
+function getUserUsage(userId, days = 7) {
+  const logs = readJSON('usage_logs.json');
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  return logs.filter(l => l.user_id === userId && l.created_at >= since);
+}
+function getTotalUsage() {
+  const logs = readJSON('usage_logs.json');
+  return logs.reduce((sum, l) => sum + (l.cost || 0), 0);
+}
+function getTodayUsage() {
+  const today = new Date().toISOString().split('T')[0];
+  const logs = readJSON('usage_logs.json');
+  return logs.filter(l => l.created_at.startsWith(today)).reduce((sum, l) => sum + (l.cost || 0), 0);
+}
+function getTodayRequests() {
+  const today = new Date().toISOString().split('T')[0];
+  const logs = readJSON('usage_logs.json');
+  return logs.filter(l => l.created_at.startsWith(today)).length;
+}
 
 // ============ Middleware ============
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/v1', express.static(path.join(__dirname, 'public')));
 
 // CORS
 app.use((req, res, next) => {
@@ -131,7 +177,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request logging
 app.use((req, res, next) => {
   if (!req.path.startsWith('/v1/')) {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -142,52 +187,34 @@ app.use((req, res, next) => {
 // Auth middleware
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.token;
-  if (!token) {
-    return res.status(401).json({ error: { message: 'Unauthorized' } });
-  }
+  if (!token) return res.status(401).json({ error: { message: 'Unauthorized' } });
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
-    if (!user || user.status !== 'active') {
-      return res.status(401).json({ error: { message: 'Unauthorized' } });
-    }
+    const user = getUserById(decoded.userId);
+    if (!user || user.status !== 'active') return res.status(401).json({ error: { message: 'Unauthorized' } });
     req.user = user;
     next();
-  } catch (e) {
-    return res.status(401).json({ error: { message: 'Invalid token' } });
-  }
+  } catch (e) { return res.status(401).json({ error: { message: 'Invalid token' } }); }
 }
 
 function adminMiddleware(req, res, next) {
   authMiddleware(req, res, () => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: { message: 'Forbidden' } });
-    }
+    if (req.user.role !== 'admin') return res.status(403).json({ error: { message: 'Forbidden' } });
     next();
   });
 }
 
-// API key auth (for /v1 endpoints)
 function apiKeyAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: { message: 'Missing API key. Set Authorization: Bearer sk-xxx' } });
   }
   const apiKey = authHeader.replace('Bearer ', '');
-  const token = db.prepare('SELECT * FROM tokens WHERE key = ? AND status = ?').get(apiKey, 'active');
-  if (!token) {
-    return res.status(401).json({ error: { message: 'Invalid API key' } });
-  }
-  const user = db.prepare('SELECT * FROM users WHERE id = ? AND status = ?').get(token.user_id, 'active');
-  if (!user) {
-    return res.status(401).json({ error: { message: 'User inactive' } });
-  }
-  if (user.balance <= 0 && token.quota_limit > 0 && token.used_quota >= token.quota_limit) {
-    return res.status(402).json({ error: { message: 'Insufficient balance' } });
-  }
-  if (user.balance <= 0) {
-    return res.status(402).json({ error: { message: 'Insufficient balance. Please recharge.' } });
-  }
+  const token = findToken(apiKey);
+  if (!token) return res.status(401).json({ error: { message: 'Invalid API key' } });
+  const user = getUserById(token.user_id);
+  if (!user) return res.status(401).json({ error: { message: 'User inactive' } });
+  if (user.balance <= 0) return res.status(402).json({ error: { message: 'Insufficient balance. Please recharge.' } });
   req.token = token;
   req.user = user;
   next();
@@ -196,40 +223,35 @@ function apiKeyAuth(req, res, next) {
 // ============ Auth Routes ============
 app.post('/api/auth/register', (req, res) => {
   const { username, email, password } = req.body;
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: { message: 'All fields required' } });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: { message: 'Password must be at least 6 characters' } });
-  }
-  const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
-  if (existing) {
+  if (!username || !email || !password) return res.status(400).json({ error: { message: 'All fields required' } });
+  if (password.length < 6) return res.status(400).json({ error: { message: 'Password must be at least 6 characters' } });
+  const users = readJSON('users.json');
+  if (users.find(u => u.username === username || u.email === email)) {
     return res.status(409).json({ error: { message: 'Username or email already exists' } });
   }
   const userId = uuidv4();
   const hashedPassword = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (id, username, email, password, balance) VALUES (?, ?, ?, ?, ?)')
-    .run(userId, username, email, hashedPassword, CONFIG.signupBonus);
+  users.push({
+    id: userId, username, email,
+    password: hashedPassword, role: 'user',
+    balance: CONFIG.signupBonus, used_quota: 0,
+    status: 'active', created_at: new Date().toISOString(),
+  });
+  writeJSON('users.json', users);
   const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ success: true, token, user: { id: userId, username, email, balance: CONFIG.signupBonus } });
 });
 
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: { message: 'Username and password required' } });
-  }
-  const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, username);
+  if (!username || !password) return res.status(400).json({ error: { message: 'Username and password required' } });
+  const user = readJSON('users.json').find(u => (u.username === username || u.email === username) && u.status === 'active');
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: { message: 'Invalid credentials' } });
   }
-  if (user.status !== 'active') {
-    return res.status(403).json({ error: { message: 'Account suspended' } });
-  }
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   res.json({
-    success: true,
-    token,
+    success: true, token,
     user: { id: user.id, username: user.username, email: user.email, balance: user.balance, role: user.role }
   });
 });
@@ -238,62 +260,45 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
   res.json({
     success: true,
     user: {
-      id: req.user.id,
-      username: req.user.username,
-      email: req.user.email,
-      balance: req.user.balance,
-      used_quota: req.user.used_quota,
-      role: req.user.role,
-      created_at: req.user.created_at,
+      id: req.user.id, username: req.user.username, email: req.user.email,
+      balance: req.user.balance, used_quota: req.user.used_quota,
+      role: req.user.role, created_at: req.user.created_at,
     }
   });
 });
 
 // ============ Token Management ============
 app.get('/api/tokens', authMiddleware, (req, res) => {
-  const tokens = db.prepare('SELECT id, name, key, quota_limit, used_quota, status, created_at FROM tokens WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+  const tokens = getUserTokens(req.user.id);
   res.json({ success: true, data: tokens });
 });
 
 app.post('/api/tokens', authMiddleware, (req, res) => {
   const { name, quota_limit } = req.body;
-  const tokenId = uuidv4();
-  const apiKey = 'sk-' + crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO tokens (id, user_id, name, key, quota_limit) VALUES (?, ?, ?, ?, ?)')
-    .run(tokenId, req.user.id, name || 'default', apiKey, quota_limit || 0);
-  res.json({ success: true, data: { id: tokenId, key: apiKey, name: name || 'default', quota_limit: quota_limit || 0 } });
+  const token = addToken(req.user.id, name, quota_limit);
+  res.json({ success: true, data: { id: token.id, key: token.key, name: token.name, quota_limit: token.quota_limit } });
 });
 
 app.delete('/api/tokens/:id', authMiddleware, (req, res) => {
-  db.prepare('DELETE FROM tokens WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  deleteToken(req.params.id, req.user.id);
   res.json({ success: true });
 });
 
 app.put('/api/tokens/:id', authMiddleware, (req, res) => {
-  const { name, status, quota_limit } = req.body;
-  db.prepare('UPDATE tokens SET name = COALESCE(?, name), status = COALESCE(?, status), quota_limit = COALESCE(?, quota_limit) WHERE id = ? AND user_id = ?')
-    .run(name, status, quota_limit, req.params.id, req.user.id);
+  updateToken(req.params.id, req.user.id, req.body);
   res.json({ success: true });
 });
 
 // ============ Usage Stats ============
 app.get('/api/usage', authMiddleware, (req, res) => {
   const days = parseInt(req.query.days) || 7;
-  const logs = db.prepare(`
-    SELECT date(created_at) as date, model,
-           SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens,
-           SUM(cost) as cost, COUNT(*) as count
-    FROM usage_logs
-    WHERE user_id = ? AND created_at >= datetime('now', ?)
-    GROUP BY date(created_at), model
-    ORDER BY date DESC
-  `).all(req.user.id, `-${days} days`);
+  const logs = getUserUsage(req.user.id, days);
   res.json({ success: true, data: logs });
 });
 
 app.get('/api/usage/recent', authMiddleware, (req, res) => {
   const limit = parseInt(req.query.limit) || 50;
-  const logs = db.prepare('SELECT * FROM usage_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(req.user.id, limit);
+  const logs = getUserUsage(req.user.id, 365).slice(-limit).reverse();
   res.json({ success: true, data: logs });
 });
 
@@ -301,8 +306,7 @@ app.get('/api/usage/recent', authMiddleware, (req, res) => {
 app.get('/api/models', (req, res) => {
   const models = CONFIG.models.map(m => {
     const multiplier = CONFIG.modelMultipliers[m.id] || CONFIG.defaultMultiplier;
-    return {
-      ...m,
+    return { ...m,
       input_price: (m.input * multiplier).toFixed(4),
       output_price: (m.output * multiplier).toFixed(4),
       multiplier,
@@ -314,49 +318,38 @@ app.get('/api/models', (req, res) => {
 // ============ Recharge ============
 app.post('/api/recharge', authMiddleware, (req, res) => {
   const { amount } = req.body;
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ error: { message: 'Invalid amount' } });
-  }
-  // Manual recharge - in production this would integrate with payment gateway
-  db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, req.user.id);
-  const orderId = uuidv4();
-  db.prepare('INSERT INTO recharge_orders (id, user_id, amount, status) VALUES (?, ?, ?, ?)')
-    .run(orderId, req.user.id, amount, 'completed');
+  if (!amount || amount <= 0) return res.status(400).json({ error: { message: 'Invalid amount' } });
+  updateUser(req.user.id, { balance: Math.round((req.user.balance + amount) * 1000000) / 1000000 });
   res.json({ success: true, message: 'Recharge successful', new_balance: req.user.balance + amount });
 });
 
 // ============ Admin Routes ============
 app.get('/api/admin/stats', adminMiddleware, (req, res) => {
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-  const tokenCount = db.prepare('SELECT COUNT(*) as count FROM tokens').get().count;
-  const totalUsage = db.prepare('SELECT SUM(cost) as total FROM usage_logs').get().total || 0;
-  const todayUsage = db.prepare("SELECT SUM(cost) as total FROM usage_logs WHERE date(created_at) = date('now')").get().total || 0;
-  const todayRequests = db.prepare("SELECT COUNT(*) as count FROM usage_logs WHERE date(created_at) = date('now')").get().count;
   res.json({
     success: true,
-    data: { userCount, tokenCount, totalUsage, todayUsage, todayRequests }
+    data: {
+      userCount: getAllUsers().length,
+      tokenCount: readJSON('tokens.json').length,
+      totalUsage: Math.round(getTotalUsage() * 1000000) / 1000000,
+      todayUsage: Math.round(getTodayUsage() * 1000000) / 1000000,
+      todayRequests: getTodayRequests(),
+    }
   });
 });
 
 app.get('/api/admin/users', adminMiddleware, (req, res) => {
-  const users = db.prepare('SELECT id, username, email, role, balance, used_quota, status, created_at FROM users ORDER BY created_at DESC').all();
-  res.json({ success: true, data: users });
+  res.json({ success: true, data: getAllUsers() });
 });
 
 app.put('/api/admin/users/:id', adminMiddleware, (req, res) => {
-  const { status, balance, role } = req.body;
-  db.prepare('UPDATE users SET status = COALESCE(?, status), balance = COALESCE(?, balance), role = COALESCE(?, role) WHERE id = ?')
-    .run(status, balance, role, req.params.id);
+  updateUser(req.params.id, req.body);
   res.json({ success: true });
 });
 
 // ============ API Proxy (OpenAI-compatible) ============
 app.get('/v1/models', apiKeyAuth, (req, res) => {
   const models = CONFIG.models.map(m => ({
-    id: m.id,
-    object: 'model',
-    created: 1700000000,
-    owned_by: m.provider.toLowerCase(),
+    id: m.id, object: 'model', created: 1700000000, owned_by: m.provider.toLowerCase(),
   }));
   res.json({ object: 'list', data: models });
 });
@@ -379,7 +372,7 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
   const inputPricePerToken = (modelConfig.input * multiplier) / 1000000;
   const outputPricePerToken = (modelConfig.output * multiplier) / 1000000;
 
-  // Forward to upstream
+  const https = require('https');
   const options = {
     hostname: 'api.quickrouter.ai',
     port: 443,
@@ -391,7 +384,6 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
     },
   };
 
-  const https = require('https');
   const proxyReq = https.request(options, (proxyRes) => {
     if (stream) {
       res.setHeader('Content-Type', 'text/event-stream');
@@ -404,19 +396,18 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
       proxyRes.on('end', () => {
         try {
           const data = JSON.parse(body);
-          // Calculate cost
           const inputTokens = data.usage?.prompt_tokens || 0;
           const outputTokens = data.usage?.completion_tokens || 0;
           const cost = (inputTokens * inputPricePerToken) + (outputTokens * outputPricePerToken);
 
-          // Deduct balance
-          db.prepare('UPDATE users SET balance = balance - ?, used_quota = used_quota + ? WHERE id = ?')
-            .run(cost, cost, req.user.id);
-          db.prepare('UPDATE tokens SET used_quota = used_quota + ? WHERE id = ?')
-            .run(cost, req.token.id);
-          // Log usage
-          db.prepare('INSERT INTO usage_logs (user_id, token_id, model, input_tokens, output_tokens, cost) VALUES (?, ?, ?, ?, ?, ?)')
-            .run(req.user.id, req.token.id, model, inputTokens, outputTokens, cost);
+          updateUser(req.user.id, {
+            balance: Math.round((req.user.balance - cost) * 1000000) / 1000000,
+            used_quota: Math.round((req.user.used_quota + cost) * 1000000) / 1000000,
+          });
+          updateToken(req.token.id, req.user.id, {
+            used_quota: Math.round((req.token.used_quota + cost) * 1000000) / 1000000,
+          });
+          addUsageLog(req.user.id, req.token.id, model, inputTokens, outputTokens, cost);
 
           res.json(data);
         } catch (e) {
@@ -431,7 +422,6 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
     res.status(502).json({ error: { message: 'Failed to connect to upstream', detail: e.message } });
   });
 
-  // Forward the request body
   const forwardBody = JSON.stringify({ ...req.body, stream: false });
   proxyReq.write(forwardBody);
   proxyReq.end();
@@ -440,8 +430,7 @@ app.post('/v1/chat/completions', apiKeyAuth, async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
-    success: true,
-    status: 'ok',
+    success: true, status: 'ok',
     upstream_configured: !!CONFIG.upstream.apiKey,
     models_count: CONFIG.models.length,
     timestamp: new Date().toISOString(),
@@ -456,30 +445,12 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ============ Init: create admin user ============
-function initAdmin() {
-  const adminExists = db.prepare("SELECT id FROM users WHERE role = 'admin'").get();
-  if (!adminExists) {
-    const adminId = uuidv4();
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.prepare("INSERT INTO users (id, username, email, password, role, balance) VALUES (?, ?, ?, ?, 'admin', 1000)")
-      .run(adminId, 'admin', 'admin@localhost', hashedPassword);
-    console.log('\n============================================');
-    console.log('  Admin account created:');
-    console.log('  Username: admin');
-    console.log('  Password: admin123');
-    console.log('  Balance:  $1000 (for testing)');
-    console.log('============================================\n');
-  }
-}
-
 // ============ Start ============
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('\n============================================');
+  console.log(`\n================================================`);
   console.log(`  AI API Gateway running on port ${PORT}`);
-  console.log(`  Landing page:  http://localhost:${PORT}`);
-  console.log(`  Admin login:    http://localhost:${PORT}/login.html`);
-  console.log(`  API endpoint:   http://localhost:${PORT}/v1`);
-  console.log('============================================\n');
+  console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`  Upstream configured: ${!!CONFIG.upstream.apiKey}`);
+  console.log(`============================================\n`);
   initAdmin();
 });
