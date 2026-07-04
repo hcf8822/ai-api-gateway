@@ -65,7 +65,7 @@ function writeJSON(file, data) {
 function getPaymentConfig() {
   return readJSON('payment_config.json', {
     wechat_qr: '', alipay_qr: '', contact: '',
-    bnb_address: '', bnb_usdt_note: 'USDT(BEP20) 或 BNB 均可，付款后提交交易哈希'
+    bnb_address: '0x523EAD75baD4F8AFC5cE47b0c354321f38918F04', bnb_usdt_note: 'USDT(BEP20) 或 BNB 均可，付款后提交交易哈希'
   });
 }
 function setPaymentConfig(cfg) {
